@@ -272,7 +272,7 @@ function RoomReady({ onNavigate }) {
   const [draft, setDraft] = useState("");
   const [playing, setPlaying] = useState(false);
   const hostToken = sessionStorage.getItem(`echo.host.${code}`);
-  const member = JSON.parse(sessionStorage.getItem(`echo.member.${code}`) || "null");
+  const member = readMember(code);
   const name = member?.name || room?.host || "Guest";
 
   useEffect(() => {
@@ -315,6 +315,15 @@ function RoomReady({ onNavigate }) {
   if (error && !room) return <Shell onHome={() => onNavigate("/")}><section className="route-card route-status"><span className="section-label">Room unavailable</span><h1>This room <em>isn’t ready.</em></h1><p className="route-description">{error}</p><button className="primary-cta form-cta" onClick={() => onNavigate("/create-room")}>Create a room <span>↗</span></button></section></Shell>;
   if (!room) return <Shell onHome={() => onNavigate("/")}><section className="route-card route-status"><span className="section-label">Connecting</span><h1>Finding your <em>room.</em></h1><p className="route-description">Connecting to the Echo server…</p></section></Shell>;
   return <Shell onHome={() => onNavigate("/")}><section className="route-card live-room-card"><span className="section-label">Live listening room</span><h1>{room.name} <em>is live.</em></h1><p className="route-description">Room code <strong className="inline-code">{room.code}</strong> · hosted by {room.host}</p><div className="live-room-grid"><div><strong>{members.length}</strong><span>listeners online</span></div><button className="primary-cta form-cta" onClick={updatePlayback}>{playing ? "Pause" : "Play"} together <span>{playing ? "Ⅱ" : "▶"}</span></button></div><form className="room-chat-form" onSubmit={sendMessage}><input value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Say something to the room…" maxLength="500" /><button type="submit">Send</button></form><div className="room-messages">{messages.map((message) => <p key={message.id}><strong>{message.author}</strong> {message.text}</p>)}</div>{error && <p className="form-error" role="alert">{error}</p>}</section></Shell>;
+}
+
+function readMember(code) {
+  try {
+    const stored = JSON.parse(sessionStorage.getItem(`echo.member.${code}`) || "null");
+    return stored && typeof stored === "object" && !Array.isArray(stored) ? stored : null;
+  } catch {
+    return null;
+  }
 }
 
 export default App;
