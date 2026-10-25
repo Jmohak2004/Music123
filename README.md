@@ -24,6 +24,12 @@ presence, and host playback events over Socket.IO.
 npm run server
 ```
 
+Run the realtime smoke test while the server is running in another terminal:
+
+```bash
+npm run test:integration
+```
+
 Set `VITE_API_URL` when the frontend and backend run on different origins:
 
 ```bash
