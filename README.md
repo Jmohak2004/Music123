@@ -15,6 +15,13 @@ Build the production bundle with:
 npm run build
 ```
 
+## Structure
+
+- `src/App.jsx` contains the landing page sections and join-room interaction.
+- `src/main.jsx` mounts the React application.
+- `styles.css` contains the responsive visual system.
+- `vite.config.js` configures the React build.
+
 ## Product flow
 
 1. A host creates a private room.
