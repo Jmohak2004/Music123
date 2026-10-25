@@ -118,4 +118,12 @@ function randomPart(length) {
   return Array.from(crypto.randomBytes(length), (byte) => alphabet[byte % alphabet.length]).join("");
 }
 
-httpServer.listen(port, () => console.log(`Echo server listening on port ${port}`));
+const server = httpServer.listen(port, () => console.log(`Echo server listening on port ${port}`));
+
+function shutdown(signal) {
+  console.log(`${signal} received, closing Echo server`);
+  io.close(() => server.close(() => process.exit(0)));
+}
+
+process.once("SIGTERM", () => shutdown("SIGTERM"));
+process.once("SIGINT", () => shutdown("SIGINT"));
