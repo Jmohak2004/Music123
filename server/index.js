@@ -5,8 +5,9 @@ import { Server } from "socket.io";
 
 const app = express();
 const httpServer = createServer(app);
+const defaultClientOrigins = ["https://echo-psi-sable.vercel.app", "http://localhost:5173"];
 const io = new Server(httpServer, {
-  cors: { origin: process.env.CLIENT_ORIGIN?.split(",") || true },
+  cors: { origin: (process.env.CLIENT_ORIGIN || defaultClientOrigins.join(",")).split(",").map((origin) => origin.trim()) },
 });
 const rooms = new Map();
 const port = Number(process.env.PORT || 3000);
@@ -14,7 +15,7 @@ const maxRoomAgeMs = 24 * 60 * 60 * 1000;
 
 app.use(express.json({ limit: "16kb" }));
 app.use((request, response, next) => {
-  const origins = (process.env.CLIENT_ORIGIN || request.headers.origin || "*").split(",").map((origin) => origin.trim());
+  const origins = (process.env.CLIENT_ORIGIN || defaultClientOrigins.join(",")).split(",").map((origin) => origin.trim());
   const requestOrigin = request.headers.origin;
   const allowedOrigin = origins.includes("*") || !requestOrigin || origins.includes(requestOrigin) ? (requestOrigin || origins[0]) : "";
   if (allowedOrigin) response.setHeader("Access-Control-Allow-Origin", allowedOrigin);
