@@ -270,7 +270,8 @@ function RoomReady({ onNavigate }) {
 
 function readRooms() {
   try {
-    return JSON.parse(localStorage.getItem(ROOMS_KEY) || "{}");
+    const stored = JSON.parse(localStorage.getItem(ROOMS_KEY) || "{}");
+    return stored && typeof stored === "object" && !Array.isArray(stored) ? stored : {};
   } catch {
     return {};
   }
