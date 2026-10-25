@@ -41,7 +41,7 @@ function App() {
         </nav>
       </header>
 
-      <main>
+      <main id="main-content">
         <a className="skip-link" href="#main-content">Skip to content</a>
         <section className="hero-section">
           <div className="hero-copy">
