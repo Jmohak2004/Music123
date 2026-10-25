@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 function Icon({ children, className = "" }) {
   return <svg className={className} viewBox="0 0 24 24" aria-hidden="true">{children}</svg>;
@@ -24,6 +24,15 @@ const steps = [
 
 function App() {
   const [showJoin, setShowJoin] = useState(false);
+
+  useEffect(() => {
+    if (!showJoin) return undefined;
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") setShowJoin(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [showJoin]);
 
   return (
     <div className="landing-page">
