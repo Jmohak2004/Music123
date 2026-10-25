@@ -11,6 +11,7 @@
   --sans: "Space Grotesk", sans-serif;
 }
 
+noscript { display: block; padding: 18px; background: var(--ink); color: #fff; text-align: center; font: 12px var(--sans); }
 * { box-sizing: border-box; }
 body { margin: 0; color: var(--ink); background: var(--paper); font-family: var(--sans); min-height: 100vh; overflow-x: hidden; }
 button, input { font: inherit; }
