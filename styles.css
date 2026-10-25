@@ -57,6 +57,8 @@ h1 em { color: var(--coral); font-style: normal; }
 
 /* Landing page */
 .landing-page { position: relative; min-height: 100vh; overflow: hidden; background: var(--paper); }
+.skip-link { position: fixed; z-index: 20; top: 10px; left: 10px; padding: 10px 14px; border-radius: 4px; background: var(--ink); color: #fff; transform: translateY(-150%); transition: transform .2s ease; }
+.skip-link:focus { transform: translateY(0); }
 .landing-glow { position: absolute; z-index: 0; border-radius: 50%; pointer-events: none; filter: blur(1px); }
 .landing-glow-one { width: 520px; height: 520px; top: 65px; right: -175px; background: #edd8cf; opacity: .48; }
 .landing-glow-two { width: 420px; height: 420px; bottom: 240px; left: -260px; background: #e4e0ee; opacity: .55; }
