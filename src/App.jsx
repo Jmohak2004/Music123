@@ -125,7 +125,7 @@ function App() {
             <p>Ask the host for their code, then join the shared listening session.</p>
             <form action="/room/join" method="get">
               <label htmlFor="room-code-input">Room code</label>
-              <input id="room-code-input" name="code" placeholder="e.g. SUN-482" autoComplete="off" required />
+              <input id="room-code-input" name="code" placeholder="e.g. SUN-482" autoComplete="off" maxLength="12" spellCheck="false" autoFocus required />
               <button className="primary-cta dialog-cta" type="submit">Join room <span>↗</span></button>
             </form>
           </div>
