@@ -91,6 +91,12 @@ io.on("connection", (socket) => {
   });
 });
 
+app.use("/api", (_request, response) => response.status(404).json({ error: "API route not found." }));
+app.use((error, _request, response, _next) => {
+  console.error("Unhandled server error", error);
+  response.status(500).json({ error: "Internal server error." });
+});
+
 setInterval(() => {
   const cutoff = Date.now() - maxRoomAgeMs;
   for (const [code, room] of rooms) if (room.createdAt < cutoff && room.members.size === 0) rooms.delete(code);
