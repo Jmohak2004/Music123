@@ -24,7 +24,7 @@ app.use((request, response, next) => {
   if (request.method === "OPTIONS") return response.sendStatus(204);
   return next();
 });
-app.get("/health", (_request, response) => response.json({ ok: true }));
+app.get("/health", (_request, response) => response.json({ ok: true, service: "echo-api", uptime: Math.round(process.uptime()) }));
 
 app.post("/api/rooms", (request, response) => {
   const name = cleanText(request.body?.name, 48);
