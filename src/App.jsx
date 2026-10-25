@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
+import { io } from "socket.io-client";
 
-const ROOMS_KEY = "echo.rooms";
+const API_BASE = import.meta.env.VITE_API_URL || "";
 
 function Icon({ children, className = "" }) {
   return <svg className={className} viewBox="0 0 24 24" aria-hidden="true">{children}</svg>;
@@ -180,7 +181,7 @@ function CreateRoom({ onNavigate }) {
   const [hostName, setHostName] = useState("");
   const [error, setError] = useState("");
 
-  function createRoom(event) {
+  async function createRoom(event) {
     event.preventDefault();
     const name = roomName.trim();
     const host = hostName.trim();
@@ -188,22 +189,15 @@ function CreateRoom({ onNavigate }) {
       setError("Add a room name and your name to continue.");
       return;
     }
-    let code;
     try {
-      code = createRoomCode();
+      const response = await fetch(`${API_BASE}/api/rooms`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, host }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Room could not be created.");
+      sessionStorage.setItem(`echo.host.${result.code}`, result.hostToken);
+      onNavigate(`/room/${result.code}`);
     } catch {
-      setError("This browser cannot generate a secure room code. Try a modern browser.");
-      return;
+      setError("The server could not create this room. Check that the backend is running and try again.");
     }
-    const rooms = readRooms();
-    rooms[code] = { code, name, host, createdAt: new Date().toISOString() };
-    try {
-      localStorage.setItem(ROOMS_KEY, JSON.stringify(rooms));
-    } catch {
-      setError("This browser is blocking local room storage. Allow site storage and try again.");
-      return;
-    }
-    onNavigate(`/room/${code}`);
   }
 
   return (
@@ -211,7 +205,7 @@ function CreateRoom({ onNavigate }) {
       <section className="route-card">
         <span className="section-label">Start listening together</span>
         <h1>Create your <em>room.</em></h1>
-        <p className="route-description">Give your room a name and get a code. Rooms are currently saved in this browser while the server connection is being built.</p>
+        <p className="route-description">Give your room a name and get a code your friends can use to join from any device.</p>
         <form className="room-form" onSubmit={createRoom}>
           <label htmlFor="room-name">Room name</label>
           <input id="room-name" value={roomName} onChange={(event) => setRoomName(event.target.value)} placeholder="Sunday slowdown" maxLength="48" required />
@@ -230,16 +224,24 @@ function JoinRoom({ onNavigate }) {
   const initialCode = query.get("code") || "";
   const [code, setCode] = useState(initialCode);
   const [error, setError] = useState("");
+  const [name, setName] = useState("");
 
-  function joinRoom(event) {
+  async function joinRoom(event) {
     event.preventDefault();
     const normalizedCode = code.trim().toUpperCase();
-    const room = readRooms()[normalizedCode];
-    if (!room) {
-      setError("We couldn’t find that room on this browser. Check the code or ask the host to create a new room.");
-      return;
+    try {
+      const response = await fetch(`${API_BASE}/api/rooms/${normalizedCode}`);
+      if (!response.ok) throw new Error("Room not found.");
+      if (!name.trim()) { setError("Enter your name to join the room."); return; }
+      const result = await response.json();
+      const joinResponse = await fetch(`${API_BASE}/api/rooms/${normalizedCode}/join`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) });
+      const joinResult = await joinResponse.json();
+      if (!joinResponse.ok) throw new Error(joinResult.error || "Could not join room.");
+      sessionStorage.setItem(`echo.member.${result.code}`, JSON.stringify({ token: joinResult.participantToken, name }));
+      onNavigate(`/room/${result.code}`);
+    } catch {
+      setError("We couldn’t find or join that room. Check the code and try again.");
     }
-    onNavigate(`/room/${room.code}`);
   }
 
   return (
@@ -251,6 +253,8 @@ function JoinRoom({ onNavigate }) {
         <form className="room-form" onSubmit={joinRoom}>
           <label htmlFor="join-code">Room code</label>
           <input id="join-code" value={code} onChange={(event) => { setCode(event.target.value.toUpperCase()); setError(""); }} placeholder="e.g. SUN-482" maxLength="7" autoComplete="off" spellCheck="false" required autoFocus />
+          <label htmlFor="join-name">Your name</label>
+          <input id="join-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="Your name" maxLength="32" required />
           {error && <p className="form-error" role="alert">{error}</p>}
           <button className="primary-cta form-cta" type="submit">Join room <span>↗</span></button>
         </form>
@@ -261,27 +265,56 @@ function JoinRoom({ onNavigate }) {
 
 function RoomReady({ onNavigate }) {
   const code = window.location.pathname.split("/").pop().toUpperCase();
-  const room = readRooms()[code];
-  if (!room) {
-    return <Shell onHome={() => onNavigate("/")}><section className="route-card route-status"><span className="section-label">Room unavailable</span><h1>This room <em>doesn’t exist.</em></h1><p className="route-description">Room codes are stored locally until a server is connected. Create a room here or ask the host to share a valid code on this device.</p><button className="primary-cta form-cta" onClick={() => onNavigate("/create-room")}>Create a room <span>↗</span></button></section></Shell>;
-  }
-  return <Shell onHome={() => onNavigate("/")}><section className="route-card route-status"><span className="section-label">Room created in this browser</span><h1>{room.name} <em>is ready.</em></h1><p className="route-description">Your room code is ready for the next step. Cross-device rooms and synchronized playback will be enabled when the server connection is added.</p><div className="created-code">{room.code}</div><p className="room-meta">Hosted by {room.host}</p><button className="secondary-cta" onClick={() => onNavigate("/")}>Back to Echo <span>↗</span></button></section></Shell>;
-}
+  const [room, setRoom] = useState(null);
+  const [error, setError] = useState("");
+  const [members, setMembers] = useState([]);
+  const [messages, setMessages] = useState([]);
+  const [draft, setDraft] = useState("");
+  const [playing, setPlaying] = useState(false);
+  const hostToken = sessionStorage.getItem(`echo.host.${code}`);
+  const member = JSON.parse(sessionStorage.getItem(`echo.member.${code}`) || "null");
+  const name = member?.name || room?.host || "Guest";
 
-function readRooms() {
-  try {
-    const stored = JSON.parse(localStorage.getItem(ROOMS_KEY) || "{}");
-    return stored && typeof stored === "object" && !Array.isArray(stored) ? stored : {};
-  } catch {
-    return {};
-  }
-}
+  useEffect(() => {
+    fetch(`${API_BASE}/api/rooms/${code}`).then(async (response) => {
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error);
+      setRoom(result);
+      setPlaying(result.playback.playing);
+    }).catch(() => setError("This room does not exist or the server is offline."));
+  }, [code]);
 
-function createRoomCode() {
-  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  const bytes = new Uint8Array(6);
-  crypto.getRandomValues(bytes);
-  return `${Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).slice(0, 3).join("")}-${Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).slice(3).join("")}`;
+  useEffect(() => {
+    if (!room) return undefined;
+    const socket = io(API_BASE || undefined, { transports: ["websocket", "polling"] });
+    socket.emit("room:join", { code, name, token: member?.token, hostToken }, (result) => {
+      if (!result?.ok) setError(result?.error || "Could not join live room.");
+    });
+    socket.on("room:members", setMembers);
+    socket.on("playback:updated", (state) => setPlaying(state.playing));
+    socket.on("chat:message", (message) => setMessages((current) => [...current, message]));
+    return () => socket.disconnect();
+  }, [room, code, name, member?.token, hostToken]);
+
+  function sendMessage(event) {
+    event.preventDefault();
+    const text = draft.trim();
+    if (!text || !room) return;
+    const socket = io(API_BASE || undefined, { autoConnect: false });
+    socket.connect();
+    socket.emit("room:join", { code, name, token: member?.token, hostToken }, () => socket.emit("chat:send", { text }, () => { socket.disconnect(); }));
+    setDraft("");
+  }
+
+  function updatePlayback() {
+    setPlaying((current) => !current);
+    const socket = io(API_BASE || undefined);
+    socket.emit("room:join", { code, name, token: member?.token, hostToken }, () => socket.emit("playback:update", { playing: !playing, position: 0 }, () => socket.disconnect()));
+  }
+
+  if (error && !room) return <Shell onHome={() => onNavigate("/")}><section className="route-card route-status"><span className="section-label">Room unavailable</span><h1>This room <em>isn’t ready.</em></h1><p className="route-description">{error}</p><button className="primary-cta form-cta" onClick={() => onNavigate("/create-room")}>Create a room <span>↗</span></button></section></Shell>;
+  if (!room) return <Shell onHome={() => onNavigate("/")}><section className="route-card route-status"><span className="section-label">Connecting</span><h1>Finding your <em>room.</em></h1><p className="route-description">Connecting to the Echo server…</p></section></Shell>;
+  return <Shell onHome={() => onNavigate("/")}><section className="route-card live-room-card"><span className="section-label">Live listening room</span><h1>{room.name} <em>is live.</em></h1><p className="route-description">Room code <strong className="inline-code">{room.code}</strong> · hosted by {room.host}</p><div className="live-room-grid"><div><strong>{members.length}</strong><span>listeners online</span></div><button className="primary-cta form-cta" onClick={updatePlayback}>{playing ? "Pause" : "Play"} together <span>{playing ? "Ⅱ" : "▶"}</span></button></div><form className="room-chat-form" onSubmit={sendMessage}><input value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Say something to the room…" maxLength="500" /><button type="submit">Send</button></form><div className="room-messages">{messages.map((message) => <p key={message.id}><strong>{message.author}</strong> {message.text}</p>)}</div>{error && <p className="form-error" role="alert">{error}</p>}</section></Shell>;
 }
 
 export default App;

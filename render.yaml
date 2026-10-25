@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: echo-api
+    runtime: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: CLIENT_ORIGIN
+        sync: false
