@@ -67,6 +67,7 @@ h1 em { color: var(--coral); font-style: normal; }
 .landing-nav { display: flex; align-items: center; gap: 33px; }
 .landing-nav a, .landing-nav button { color: #77746f; font-size: 11px; text-decoration: none; }
 .landing-nav a:hover { color: var(--ink); }
+.landing-nav a:focus-visible, .landing-nav button:focus-visible, .primary-cta:focus-visible, .secondary-cta:focus-visible, .close-dialog:focus-visible, .dialog-cta:focus-visible { outline: 2px solid var(--coral); outline-offset: 4px; }
 .nav-join { padding: 10px 14px; border: 1px solid #d1cdc5; border-radius: 4px; background: rgba(255,254,250,.5); }.nav-join span { margin-left: 8px; color: var(--coral); }
 .hero-section { width: min(1180px, 88vw); min-height: 570px; margin: 42px auto 0; display: grid; grid-template-columns: .92fr 1.08fr; align-items: center; gap: 35px; }
 .hero-copy { padding-bottom: 45px; }.hero-copy .eyebrow { margin-bottom: 22px; }
