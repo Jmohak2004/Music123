@@ -42,6 +42,7 @@ function App() {
       </header>
 
       <main>
+        <a className="skip-link" href="#main-content">Skip to content</a>
         <section className="hero-section">
           <div className="hero-copy">
             <div className="eyebrow"><span className="eyebrow-line" />Listen together</div>
