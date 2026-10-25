@@ -211,7 +211,7 @@ function CreateRoom({ onNavigate }) {
           <input id="room-name" value={roomName} onChange={(event) => setRoomName(event.target.value)} placeholder="Sunday slowdown" maxLength="48" required />
           <label htmlFor="host-name">Your name</label>
           <input id="host-name" value={hostName} onChange={(event) => setHostName(event.target.value)} placeholder="Maya" maxLength="32" required />
-          {error && <p className="form-error" role="alert">{error}</p>}
+          {error && <p className="form-error" role="alert" aria-live="assertive">{error}</p>}
           <button className="primary-cta form-cta" type="submit">Create room <span>↗</span></button>
         </form>
       </section>
@@ -255,7 +255,7 @@ function JoinRoom({ onNavigate }) {
           <input id="join-code" value={code} onChange={(event) => { setCode(event.target.value.toUpperCase()); setError(""); }} placeholder="e.g. SUN-482" maxLength="7" autoComplete="off" spellCheck="false" required autoFocus />
           <label htmlFor="join-name">Your name</label>
           <input id="join-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="Your name" maxLength="32" required />
-          {error && <p className="form-error" role="alert">{error}</p>}
+          {error && <p className="form-error" role="alert" aria-live="assertive">{error}</p>}
           <button className="primary-cta form-cta" type="submit">Join room <span>↗</span></button>
         </form>
       </section>
@@ -312,9 +312,9 @@ function RoomReady({ onNavigate }) {
     socket.emit("room:join", { code, name, token: member?.token, hostToken }, () => socket.emit("playback:update", { playing: !playing, position: 0 }, () => socket.disconnect()));
   }
 
-  if (error && !room) return <Shell onHome={() => onNavigate("/")}><section className="route-card route-status"><span className="section-label">Room unavailable</span><h1>This room <em>isn’t ready.</em></h1><p className="route-description">{error}</p><button className="primary-cta form-cta" onClick={() => onNavigate("/create-room")}>Create a room <span>↗</span></button></section></Shell>;
+  if (error && !room) return <Shell onHome={() => onNavigate("/")}><section className="route-card route-status" role="alert"><span className="section-label">Room unavailable</span><h1>This room <em>isn’t ready.</em></h1><p className="route-description">{error}</p><button className="primary-cta form-cta" onClick={() => onNavigate("/create-room")}>Create a room <span>↗</span></button></section></Shell>;
   if (!room) return <Shell onHome={() => onNavigate("/")}><section className="route-card route-status"><span className="section-label">Connecting</span><h1>Finding your <em>room.</em></h1><p className="route-description">Connecting to the Echo server…</p></section></Shell>;
-  return <Shell onHome={() => onNavigate("/")}><section className="route-card live-room-card"><span className="section-label">Live listening room</span><h1>{room.name} <em>is live.</em></h1><p className="route-description">Room code <strong className="inline-code">{room.code}</strong> · hosted by {room.host}</p><div className="live-room-grid"><div><strong>{members.length}</strong><span>listeners online</span></div><button className="primary-cta form-cta" onClick={updatePlayback}>{playing ? "Pause" : "Play"} together <span>{playing ? "Ⅱ" : "▶"}</span></button></div><form className="room-chat-form" onSubmit={sendMessage}><input value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Say something to the room…" maxLength="500" /><button type="submit">Send</button></form><div className="room-messages">{messages.map((message) => <p key={message.id}><strong>{message.author}</strong> {message.text}</p>)}</div>{error && <p className="form-error" role="alert">{error}</p>}</section></Shell>;
+  return <Shell onHome={() => onNavigate("/")}><section className="route-card live-room-card"><span className="section-label">Live listening room</span><h1>{room.name} <em>is live.</em></h1><p className="route-description">Room code <strong className="inline-code">{room.code}</strong> · hosted by {room.host}</p><div className="live-room-grid"><div><strong>{members.length}</strong><span>listeners online</span></div><button className="primary-cta form-cta" onClick={updatePlayback}>{playing ? "Pause" : "Play"} together <span>{playing ? "Ⅱ" : "▶"}</span></button></div><form className="room-chat-form" onSubmit={sendMessage}><input value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Say something to the room…" maxLength="500" /><button type="submit">Send</button></form><div className="room-messages" aria-live="polite">{messages.map((message) => <p key={message.id}><strong>{message.author}</strong> {message.text}</p>)}</div>{error && <p className="form-error" role="alert" aria-live="assertive">{error}</p>}</section></Shell>;
 }
 
 function readMember(code) {
