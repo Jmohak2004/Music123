@@ -33,7 +33,7 @@ app.post("/api/rooms", (request, response) => {
   if (!name || !host) return response.status(400).json({ error: "Room name and host name are required." });
   const code = createCode();
   const hostToken = crypto.randomUUID();
-  rooms.set(code, { code, name, host, hostToken, members: new Map(), createdAt: Date.now(), playback: { playing: false, position: 0 } });
+  rooms.set(code, { code, name, host, hostToken, members: new Map(), createdAt: Date.now(), playback: { videoId: null, playing: false, position: 0 } });
   return response.status(201).json({ code, name, host, hostToken });
 });
 
@@ -79,8 +79,17 @@ io.on("connection", (socket) => {
     const room = getSocketRoom(socket);
     const member = room?.members.get(socket.id);
     if (!room || !member?.isHost || typeof playing !== "boolean" || !Number.isFinite(position)) return acknowledge?.({ ok: false, error: "Only the host can update playback." });
-    room.playback = { playing, position: Math.max(0, position) };
+    room.playback = { ...room.playback, playing, position: Math.max(0, position) };
     socket.to(room.code).emit("playback:updated", room.playback);
+    acknowledge?.({ ok: true });
+  });
+
+  socket.on("media:update", ({ videoId } = {}, acknowledge) => {
+    const room = getSocketRoom(socket);
+    const member = room?.members.get(socket.id);
+    if (!room || !member?.isHost || !isYouTubeVideoId(videoId)) return acknowledge?.({ ok: false, error: "Only the host can load a valid YouTube video." });
+    room.playback = { videoId, playing: false, position: 0 };
+    io.to(room.code).emit("media:updated", room.playback);
     acknowledge?.({ ok: true });
   });
 
@@ -114,6 +123,9 @@ function cleanText(value, maxLength) {
 }
 function normalizeCode(value) {
   return typeof value === "string" ? value.trim().toUpperCase() : "";
+}
+function isYouTubeVideoId(value) {
+  return typeof value === "string" && /^[\w-]{11}$/.test(value);
 }
 function createCode() {
   let code;

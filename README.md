@@ -18,7 +18,7 @@ npm run build
 ## Backend
 
 The Node service provides room creation, room lookup, joining, chat, listener
-presence, and host playback events over Socket.IO.
+presence, YouTube media loading, and host playback events over Socket.IO.
 
 ```bash
 npm run server
@@ -45,6 +45,14 @@ generated Render URL as `VITE_API_URL` for the Vercel frontend deployment.
 The current room store is in memory. It supports multiple simultaneous rooms
 on one Render instance, but rooms reset when the service restarts or scales.
 The next production step is moving `rooms` to Redis or a database.
+
+### YouTube playback
+
+The host can paste a YouTube watch URL into a live room. Echo sends only the
+video ID and playback state through Socket.IO; each device embeds and plays the
+video directly through YouTube. This avoids relaying copyrighted audio through
+Echo. Browser autoplay policies can require each listener to interact with the
+page before audio starts.
 
 ## Structure
 
