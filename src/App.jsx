@@ -46,7 +46,7 @@ function App() {
         <nav className="landing-nav" aria-label="Main navigation">
           <a href="#how-it-works">How it works</a>
           <a href="#why-echo">Why echo</a>
-          <button className="nav-join" onClick={() => setShowJoin(true)}>Join a room <span>↗</span></button>
+          <button type="button" className="nav-join" onClick={() => setShowJoin(true)}>Join a room <span>↗</span></button>
         </nav>
       </header>
 
@@ -119,7 +119,7 @@ function App() {
       {showJoin && (
         <div className="join-overlay" role="dialog" aria-modal="true" aria-labelledby="join-title" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowJoin(false); }}>
           <div className="join-card">
-            <button className="close-dialog" onClick={() => setShowJoin(false)} aria-label="Close">×</button>
+            <button type="button" className="close-dialog" onClick={() => setShowJoin(false)} aria-label="Close">×</button>
             <span className="section-label">Join a listening room</span>
             <h2 id="join-title">Enter the room code.</h2>
             <p>Ask the host for their code, then join the shared listening session.</p>
