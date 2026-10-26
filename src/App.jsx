@@ -1,11 +1,6 @@
-import { useEffect, useRef, useState } from "react";
-import { io } from "socket.io-client";
-
-const API_BASE = import.meta.env.VITE_API_URL || "";
-
-function Icon({ children, className = "" }) {
-  return <svg className={className} viewBox="0 0 24 24" aria-hidden="true">{children}</svg>;
-}
+import { useEffect, useState } from "react";
+import LiveRoom from "./LiveRoom";
+import { API_BASE, saveMember } from "./session";
 
 const steps = [
   {
@@ -51,7 +46,7 @@ function App() {
 
   if (path === "/create-room") return <CreateRoom onNavigate={navigate} />;
   if (path.startsWith("/room/join")) return <JoinRoom onNavigate={navigate} />;
-  if (path.startsWith("/room/")) return <RoomReady onNavigate={navigate} />;
+  if (path.startsWith("/room/")) return <Shell onHome={() => navigate("/")}><LiveRoom key={path} onNavigate={navigate} /></Shell>;
 
   return (
     <div className="landing-page">
@@ -180,24 +175,28 @@ function CreateRoom({ onNavigate }) {
   const [roomName, setRoomName] = useState("");
   const [hostName, setHostName] = useState("");
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
 
   async function createRoom(event) {
     event.preventDefault();
+    if (busy) return;
     const name = roomName.trim();
     const host = hostName.trim();
     if (!name || !host) {
       setError("Add a room name and your name to continue.");
       return;
     }
+    setBusy(true);
+    setError("");
     try {
       const response = await fetch(`${API_BASE}/api/rooms`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, host }) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Room could not be created.");
-      sessionStorage.setItem(`echo.host.${result.code}`, result.hostToken);
+      saveMember(result.code, result.participantToken, host);
       onNavigate(`/room/${result.code}`);
-    } catch {
-      setError("The server could not create this room. Check that the backend is running and try again.");
-    }
+    } catch (err) {
+      setError(err.message || "The server could not create this room. Please try again.");
+    } finally { setBusy(false); }
   }
 
   return (
@@ -212,7 +211,7 @@ function CreateRoom({ onNavigate }) {
           <label htmlFor="host-name">Your name</label>
           <input id="host-name" value={hostName} onChange={(event) => setHostName(event.target.value)} placeholder="Maya" maxLength="32" required />
           {error && <p className="form-error" role="alert" aria-live="assertive">{error}</p>}
-          <button className="primary-cta form-cta" type="submit">Create room <span>↗</span></button>
+          <button className="primary-cta form-cta" type="submit" disabled={busy}>{busy ? "Creating room…" : "Create room"} <span>↗</span></button>
         </form>
       </section>
     </Shell>
@@ -225,23 +224,24 @@ function JoinRoom({ onNavigate }) {
   const [code, setCode] = useState(initialCode);
   const [error, setError] = useState("");
   const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
 
   async function joinRoom(event) {
     event.preventDefault();
+    if (busy) return;
     const normalizedCode = code.trim().toUpperCase();
+    if (!name.trim()) { setError("Enter your name to join the room."); return; }
+    setBusy(true);
+    setError("");
     try {
-      const response = await fetch(`${API_BASE}/api/rooms/${normalizedCode}`);
-      if (!response.ok) throw new Error("Room not found.");
-      if (!name.trim()) { setError("Enter your name to join the room."); return; }
-      const result = await response.json();
-      const joinResponse = await fetch(`${API_BASE}/api/rooms/${normalizedCode}/join`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) });
+      const joinResponse = await fetch(`${API_BASE}/api/rooms/${encodeURIComponent(normalizedCode)}/join`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) });
       const joinResult = await joinResponse.json();
       if (!joinResponse.ok) throw new Error(joinResult.error || "Could not join room.");
-      sessionStorage.setItem(`echo.member.${result.code}`, JSON.stringify({ token: joinResult.participantToken, name }));
-      onNavigate(`/room/${result.code}`);
-    } catch {
-      setError("We couldn’t find or join that room. Check the code and try again.");
-    }
+      saveMember(joinResult.code, joinResult.participantToken, name.trim());
+      onNavigate(`/room/${joinResult.code}`);
+    } catch (err) {
+      setError(err.message || "We couldn’t join that room. Check the code and try again.");
+    } finally { setBusy(false); }
   }
 
   return (
@@ -256,154 +256,12 @@ function JoinRoom({ onNavigate }) {
           <label htmlFor="join-name">Your name</label>
           <input id="join-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="Your name" maxLength="32" required />
           {error && <p className="form-error" role="alert" aria-live="assertive">{error}</p>}
-          <button className="primary-cta form-cta" type="submit">Join room <span>↗</span></button>
+          <button className="primary-cta form-cta" type="submit" disabled={busy}>{busy ? "Joining…" : "Join room"} <span>↗</span></button>
         </form>
       </section>
     </Shell>
   );
 }
 
-function RoomReady({ onNavigate }) {
-  const code = window.location.pathname.split("/").pop().toUpperCase();
-  const [room, setRoom] = useState(null);
-  const [error, setError] = useState("");
-  const [members, setMembers] = useState([]);
-  const [messages, setMessages] = useState([]);
-  const [draft, setDraft] = useState("");
-  const [playback, setPlayback] = useState({ videoId: null, playing: false, position: 0 });
-  const [videoUrl, setVideoUrl] = useState("");
-  const hostToken = sessionStorage.getItem(`echo.host.${code}`);
-  const member = readMember(code);
-  const name = member?.name || room?.host || "Guest";
-  const socketRef = useRef(null);
-  const playerRef = useRef(null);
-  const applyingRemoteRef = useRef(false);
-
-  useEffect(() => {
-    fetch(`${API_BASE}/api/rooms/${code}`).then(async (response) => {
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error);
-      setRoom(result);
-      setPlayback(result.playback);
-    }).catch(() => setError("This room does not exist or the server is offline."));
-  }, [code]);
-
-  useEffect(() => {
-    if (!room) return undefined;
-    const socket = io(API_BASE || undefined, { transports: ["websocket", "polling"] });
-    socketRef.current = socket;
-    socket.emit("room:join", { code, name, token: member?.token, hostToken }, (result) => {
-      if (!result?.ok) setError(result?.error || "Could not join live room.");
-    });
-    socket.on("room:members", setMembers);
-    socket.on("room:state", (state) => setPlayback(state.playback));
-    socket.on("media:updated", setPlayback);
-    socket.on("playback:updated", setPlayback);
-    socket.on("chat:message", (message) => setMessages((current) => [...current, message]));
-    return () => {
-      socket.disconnect();
-      socketRef.current = null;
-    };
-  }, [room, code, name, member?.token, hostToken]);
-
-  useEffect(() => {
-    if (!playback.videoId) return undefined;
-    const loadApi = window.YT
-      ? Promise.resolve()
-      : new Promise((resolve, reject) => {
-        const existing = document.querySelector('script[src="https://www.youtube.com/iframe_api"]');
-        const previous = window.onYouTubeIframeAPIReady;
-        window.onYouTubeIframeAPIReady = () => {
-          previous?.();
-          resolve();
-        };
-        if (!existing) {
-          const script = document.createElement("script");
-          script.src = "https://www.youtube.com/iframe_api";
-          script.onerror = () => reject(new Error("YouTube player could not load."));
-          document.body.appendChild(script);
-        }
-      });
-    loadApi.then(() => {
-      playerRef.current?.destroy();
-      playerRef.current = new window.YT.Player("youtube-player", {
-        videoId: playback.videoId,
-        playerVars: { playsinline: 1, rel: 0 },
-        events: {
-          onReady: (event) => {
-            event.target.seekTo(playback.position, true);
-            if (playback.playing) event.target.playVideo();
-          },
-        },
-      });
-    }).catch(() => setError("YouTube could not load. Check the connection or try again."));
-    return () => playerRef.current?.destroy();
-  }, [playback.videoId]);
-
-  useEffect(() => {
-    const player = playerRef.current;
-    if (!player?.getPlayerState) return;
-    const currentTime = player.getCurrentTime();
-    if (Number.isFinite(playback.position) && Math.abs(currentTime - playback.position) > 2) player.seekTo(playback.position, true);
-    if (playback.playing) player.playVideo();
-    else player.pauseVideo();
-  }, [playback.playing, playback.position]);
-
-  function sendMessage(event) {
-    event.preventDefault();
-    const text = draft.trim();
-    if (!text || !room) return;
-    socketRef.current?.emit("chat:send", { text });
-    setDraft("");
-  }
-
-  function updatePlayback() {
-    if (!playerRef.current || !isHost) return;
-    const nextPlaying = !playback.playing;
-    if (nextPlaying) playerRef.current.playVideo();
-    else playerRef.current.pauseVideo();
-    socketRef.current?.emit("playback:update", { playing: nextPlaying, position: playerRef.current.getCurrentTime() });
-    setPlayback((current) => ({ ...current, playing: nextPlaying }));
-  }
-
-  function loadVideo(event) {
-    event.preventDefault();
-    if (!isHost) return;
-    const videoId = extractYouTubeVideoId(videoUrl);
-    if (!videoId) {
-      setError("Paste a valid YouTube video URL.");
-      return;
-    }
-    setError("");
-    socketRef.current?.emit("media:update", { videoId }, (result) => {
-      if (!result?.ok) setError(result?.error || "Only the host can load a video.");
-    });
-  }
-
-  if (error && !room) return <Shell onHome={() => onNavigate("/")}><section className="route-card route-status" role="alert"><span className="section-label">Room unavailable</span><h1>This room <em>isn’t ready.</em></h1><p className="route-description">{error}</p><button className="primary-cta form-cta" onClick={() => onNavigate("/create-room")}>Create a room <span>↗</span></button></section></Shell>;
-  if (!room) return <Shell onHome={() => onNavigate("/")}><section className="route-card route-status"><span className="section-label">Connecting</span><h1>Finding your <em>room.</em></h1><p className="route-description">Connecting to the Echo server…</p></section></Shell>;
-  const isHost = Boolean(hostToken);
-  return <Shell onHome={() => onNavigate("/")}><section className="route-card live-room-card"><span className="section-label">Live listening room</span><h1>{room.name} <em>is live.</em></h1><p className="route-description">Room code <strong className="inline-code">{room.code}</strong> · hosted by {room.host}</p>{isHost && <form className="youtube-form" onSubmit={loadVideo}><label htmlFor="youtube-url">Host: add a YouTube video</label><div><input id="youtube-url" value={videoUrl} onChange={(event) => setVideoUrl(event.target.value)} placeholder="https://youtube.com/watch?v=..." /><button type="submit">Load video</button></div></form>}{playback.videoId ? <div className="youtube-player-wrap"><div id="youtube-player" /></div> : <div className="youtube-empty">The host hasn’t loaded a YouTube video yet.</div>}<div className="live-room-grid"><div><strong>{members.length}</strong><span>listeners online</span></div><button className="primary-cta form-cta" onClick={updatePlayback} disabled={!isHost || !playback.videoId}>{playback.playing ? "Pause" : "Play"} together <span>{playback.playing ? "Ⅱ" : "▶"}</span></button></div><form className="room-chat-form" onSubmit={sendMessage}><input value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Say something to the room…" maxLength="500" /><button type="submit">Send</button></form><div className="room-messages" aria-live="polite">{messages.map((message) => <p key={message.id}><strong>{message.author}</strong> {message.text}</p>)}</div>{error && <p className="form-error" role="alert" aria-live="assertive">{error}</p>}</section></Shell>;
-}
-
-function extractYouTubeVideoId(value) {
-  try {
-    const url = new URL(value);
-    if (url.hostname === "youtu.be") return url.pathname.slice(1).match(/^[\w-]{11}$/)?.[0] || "";
-    if (url.hostname.endsWith("youtube.com")) return url.searchParams.get("v")?.match(/^[\w-]{11}$/)?.[0] || "";
-  } catch {
-    return "";
-  }
-  return "";
-}
-
-function readMember(code) {
-  try {
-    const stored = JSON.parse(sessionStorage.getItem(`echo.member.${code}`) || "null");
-    return stored && typeof stored === "object" && !Array.isArray(stored) ? stored : null;
-  } catch {
-    return null;
-  }
-}
 
 export default App;
