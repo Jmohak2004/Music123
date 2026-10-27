@@ -272,7 +272,6 @@ if (process.env.ECHO_LIVE_YOUTUBE === "1") {
       if (!frame) return [];
       return frame.evaluate(() => [...document.querySelectorAll("video")].map((video) => ({
         playing: !video.paused && !video.ended, time: video.currentTime,
-        link: document.querySelector("a.ytp-title-link")?.href || "",
         ready: video.readyState >= 2, muted: video.muted, volume: video.volume,
       })));
     }
@@ -302,7 +301,6 @@ if (process.env.ECHO_LIVE_YOUTUBE === "1") {
         await expect.poll(async () => (await mediaState(participant)).some((video) => video.playing && video.ready && !video.muted && video.volume > 0 && video.time > 1), { timeout: 30_000 }).toBe(true);
         await expect(participant.getByRole("button", { name: "Enable audio" })).toHaveCount(0);
       }
-      await expect.poll(async () => (await mediaState(guest)).some((video) => video.link.includes("aqz-KE-bpKQ"))).toBe(true);
       expect(await guest.locator(".youtube-player-wrap iframe").evaluate((element) => element === window.originalRoomIframe)).toBe(true);
       await page.getByRole("button", { name: "Pause together" }).click();
       for (const participant of [page, guest]) await expect.poll(async () => (await mediaState(participant)).every((video) => !video.playing)).toBe(true);

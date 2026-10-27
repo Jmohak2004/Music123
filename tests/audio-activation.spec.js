@@ -55,6 +55,6 @@ test("YouTube keeps its activated iframe across videos and source changes", asyn
     expect(await guest.evaluate(() => window.playerCreations)).toBe(1);
     expect(await guest.locator("iframe").evaluate((element) => element === window.firstPlayer)).toBe(true);
     await guest.getByRole("button", { name: "Leave room" }).click();
-    expect(await guest.evaluate(() => window.firstPlayer.isConnected)).toBe(false);
+    await expect.poll(() => guest.evaluate(() => window.firstPlayer.isConnected)).toBe(false);
   } finally { await guestContext.close(); }
 });
