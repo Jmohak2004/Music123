@@ -223,7 +223,7 @@ function CreateRoom({ onNavigate }) {
 
 function JoinRoom({ onNavigate }) {
   const query = new URLSearchParams(window.location.search);
-  const initialCode = query.get("code") || "";
+  const initialCode = (query.get("code") || "").trim().toUpperCase();
   const [code, setCode] = useState(initialCode);
   const [error, setError] = useState("");
   const [name, setName] = useState("");
@@ -255,9 +255,9 @@ function JoinRoom({ onNavigate }) {
         <p className="route-description">Use the code shared by your host to enter their room.</p>
         <form className="room-form" onSubmit={joinRoom}>
           <label htmlFor="join-code">Room code</label>
-          <input id="join-code" value={code} onChange={(event) => { setCode(event.target.value.toUpperCase()); setError(""); }} placeholder="e.g. SUN-482" maxLength="7" autoComplete="off" spellCheck="false" required autoFocus />
+          <input id="join-code" value={code} onChange={(event) => { setCode(event.target.value.toUpperCase()); setError(""); }} placeholder="e.g. SUN-482" maxLength="7" autoComplete="off" spellCheck="false" required autoFocus={!initialCode} />
           <label htmlFor="join-name">Your name</label>
-          <input id="join-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="Your name" maxLength="32" required />
+          <input id="join-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="Your name" maxLength="32" required autoFocus={Boolean(initialCode)} />
           {error && <p className="form-error" role="alert" aria-live="assertive">{error}</p>}
           <button className="primary-cta form-cta" type="submit" disabled={busy}>{busy ? "Joining…" : "Join room"} <span>↗</span></button>
         </form>
