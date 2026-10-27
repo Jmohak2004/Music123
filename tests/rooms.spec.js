@@ -78,6 +78,32 @@ test("two devices play real audio, transfer hosting, share controls, reload and 
   } finally { await guestContext.close(); }
 });
 
+test("one audio activation follows multiple host song changes without listener clicks", async ({ browser, page, context }) => {
+  await prepare(context);
+  const guestContext = await browser.newContext();
+  await prepare(guestContext);
+  const guest = await guestContext.newPage();
+  try {
+    const code = await create(page);
+    await join(guest, code, "Ravi");
+    await loadAudio(page);
+    await page.getByRole("button", { name: "Play together" }).click();
+    await guest.getByRole("button", { name: "Enable audio" }).click();
+    await expect.poll(async () => (await audioState(guest)).time).toBeGreaterThan(0.4);
+    await guest.locator("audio").evaluate((element) => { window.originalRoomAudio = element; });
+    for (const track of ["second", "third"]) {
+      await page.getByLabel("Direct audio link", { exact: true }).fill(`https://audio.echo.test/${track}.wav`);
+      await page.getByRole("button", { name: "Load music" }).click();
+      await expect(guest.locator("audio")).toHaveAttribute("src", `https://audio.echo.test/${track}.wav`);
+      await page.getByRole("button", { name: "Play together" }).click();
+      await expect.poll(async () => (await audioState(guest)).time).toBeGreaterThan(0.4);
+      await expect.poll(async () => (await audioState(guest)).paused).toBe(false);
+      await expect(guest.getByRole("button", { name: "Enable audio" })).toHaveCount(0);
+      expect(await guest.locator("audio").evaluate((element) => element === window.originalRoomAudio)).toBe(true);
+    }
+  } finally { await guestContext.close(); }
+});
+
 test("a guest starts music for three people and the new host can control the whole room", async ({ browser, page, context }) => {
   await prepare(context);
   const guestAContext = await browser.newContext();
@@ -246,6 +272,7 @@ if (process.env.ECHO_LIVE_YOUTUBE === "1") {
       if (!frame) return [];
       return frame.evaluate(() => [...document.querySelectorAll("video")].map((video) => ({
         playing: !video.paused && !video.ended, time: video.currentTime,
+        link: document.querySelector("a.ytp-title-link")?.href || "",
         ready: video.readyState >= 2, muted: video.muted, volume: video.volume,
       })));
     }
@@ -266,6 +293,17 @@ if (process.env.ECHO_LIVE_YOUTUBE === "1") {
         const times = states.map((videos) => videos.find((video) => video.playing && video.ready)?.time);
         return times.every(Number.isFinite) ? Math.abs(times[0] - times[1]) : Infinity;
       }).toBeLessThan(1.5);
+      await guest.locator(".youtube-player-wrap iframe").evaluate((element) => { window.originalRoomIframe = element; });
+      await page.getByLabel("YouTube video link").fill("https://youtu.be/aqz-KE-bpKQ");
+      await page.getByRole("button", { name: "Load music" }).click();
+      await expect(page.getByRole("button", { name: "Play together" })).toBeEnabled();
+      await page.getByRole("button", { name: "Play together" }).click();
+      for (const participant of [page, guest]) {
+        await expect.poll(async () => (await mediaState(participant)).some((video) => video.playing && video.ready && !video.muted && video.volume > 0 && video.time > 1), { timeout: 30_000 }).toBe(true);
+        await expect(participant.getByRole("button", { name: "Enable audio" })).toHaveCount(0);
+      }
+      await expect.poll(async () => (await mediaState(guest)).some((video) => video.link.includes("aqz-KE-bpKQ"))).toBe(true);
+      expect(await guest.locator(".youtube-player-wrap iframe").evaluate((element) => element === window.originalRoomIframe)).toBe(true);
       await page.getByRole("button", { name: "Pause together" }).click();
       for (const participant of [page, guest]) await expect.poll(async () => (await mediaState(participant)).every((video) => !video.playing)).toBe(true);
     } catch (error) {

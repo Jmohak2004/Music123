@@ -18,6 +18,9 @@ function loadYouTube() {
 export default function SyncedPlayer({ playback, clockOffset, connected, canControl, isHost, onPlayback }) {
   const containerRef = useRef(null);
   const audioRef = useRef(null);
+  const youtubeRef = useRef(null);
+  const youtubeReadyRef = useRef(false);
+  const activateYoutubeRef = useRef(null);
   const adapterRef = useRef(null);
   const latest = useRef({ playback, clockOffset, connected, isHost, onPlayback });
   latest.current = { playback, clockOffset, connected, isHost, onPlayback };
@@ -76,9 +79,17 @@ export default function SyncedPlayer({ playback, clockOffset, connected, canCont
     setDuration(total);
   };
 
+  // Keep the same iframe (and its audio permission) throughout the room session.
+  // Only an explicit player retry or leaving the room destroys it.
+  useEffect(() => () => {
+    const player = youtubeRef.current;
+    youtubeRef.current = null;
+    youtubeReadyRef.current = false;
+    player?.destroy();
+  }, [retry]);
+
   useEffect(() => {
     let disposed = false;
-    let player;
     let adapter;
     setReady(false);
     setError("");
@@ -136,43 +147,58 @@ export default function SyncedPlayer({ playback, clockOffset, connected, canCont
         audio.load();
       };
     } else {
-      loadYouTube().then((YT) => {
+      const activate = () => {
+        if (disposed || !youtubeReadyRef.current) return;
+        const player = youtubeRef.current;
+        player.cueVideoById({ videoId: media.videoId, startSeconds: playbackPosition(latest.current.playback, latest.current.clockOffset) });
+        finishSetup({
+          play: () => player.playVideo(), pause: () => player.pauseVideo(), seek: (time) => player.seekTo(time, true),
+          position: () => player.getCurrentTime() || 0, duration: () => player.getDuration() || 0,
+          playing: () => [1, 3].includes(player.getPlayerState()), volume: (value) => { player.setVolume(value); player.unMute(); }, tolerance: 1,
+        });
+      };
+      activateYoutubeRef.current = activate;
+      if (youtubeRef.current) activate();
+      else loadYouTube().then((YT) => {
         if (disposed) return;
         const mount = document.createElement("div");
         containerRef.current.replaceChildren(mount);
-        player = new YT.Player(mount, {
-          videoId: media.videoId,
+        const player = new YT.Player(mount, {
           width: "100%", height: "100%",
           playerVars: { playsinline: 1, rel: 0, controls: 0, disablekb: 1, origin: window.location.origin },
           events: {
-            onReady: () => finishSetup({
-              play: () => player.playVideo(), pause: () => player.pauseVideo(), seek: (time) => player.seekTo(time, true),
-              position: () => player.getCurrentTime() || 0, duration: () => player.getDuration() || 0,
-              playing: () => [1, 3].includes(player.getPlayerState()), volume: (value) => { player.setVolume(value); player.unMute(); }, tolerance: 1,
-            }),
-            onAutoplayBlocked: () => { if (!disposed) blockAudio(); },
+            onReady: () => {
+              if (youtubeRef.current !== player) return;
+              youtubeReadyRef.current = true;
+              activateYoutubeRef.current?.();
+            },
+            onAutoplayBlocked: () => {
+              if (youtubeRef.current === player && latest.current.playback.media?.type === "youtube") blockAudio();
+            },
             onStateChange: (event) => {
-              if (disposed) return;
+              if (youtubeRef.current !== player || latest.current.playback.media?.type !== "youtube") return;
               setBuffering(event.data === 3);
-              if (event.data === 0) ended();
+              if (event.data === 0) void reportEnded();
             },
             onError: (event) => {
-              if (disposed) return;
+              if (youtubeRef.current !== player || latest.current.playback.media?.type !== "youtube") return;
               adapterRef.current = null;
               setReady(false);
               setError([101, 150].includes(event.data) ? "This video cannot play in an embedded player. Ask the host to choose another video." : "YouTube could not play this video. It may be unavailable or restricted. Try another video.");
             },
           },
         });
+        youtubeRef.current = player;
       }).catch((err) => { if (!disposed) setError(err.message); });
     }
     return () => {
       disposed = true;
       if (adapterRef.current === adapter) adapterRef.current = null;
       cleanupAudio();
-      player?.destroy();
+      activateYoutubeRef.current = null;
+      if (youtubeReadyRef.current) youtubeRef.current?.pauseVideo();
     };
-  // Playback commands never recreate the media player; a new load does.
+  // Load the next source into the existing elements to retain audio activation.
   }, [playback.mediaRevision, retry]);
 
   useEffect(() => { syncRef.current(true); }, [playback.revision, clockOffset, connected]);
@@ -208,9 +234,10 @@ export default function SyncedPlayer({ playback, clockOffset, connected, canCont
 
   if (!playback.media) return <div className="youtube-empty"><span className="empty-note">♫</span><strong>The room is ready for music.</strong><p>{canControl ? "Add a YouTube or direct audio link to get started." : "Your host will choose the first track."}</p></div>;
   return <section className="shared-player" aria-label="Shared music player">
-    {playback.media.type === "youtube" ? <div className="youtube-player-wrap" ref={containerRef} /> : <div className="audio-art"><span aria-hidden="true">♫</span><div><small>NOW IN THE ROOM</small><h2>{playback.media.title}</h2><p>One track. Every device.</p></div></div>}
+    <div className="youtube-player-wrap" ref={containerRef} hidden={playback.media.type !== "youtube"} />
+    {playback.media.type === "audio" && <div className="audio-art"><span aria-hidden="true">♫</span><div><small>NOW IN THE ROOM</small><h2>{playback.media.title}</h2><p>One track. Every device.</p></div></div>}
     <audio ref={audioRef} preload="auto" />
-    {error ? <div className="player-notice" role="alert"><p>{error}</p><button type="button" className="small-button" onClick={() => setRetry((value) => value + 1)}>Retry player</button></div> : !ready ? <p className="player-note" role="status">Loading the player…</p> : !enabled && <div className="player-notice"><div><strong>Turn on sound on this device</strong><p>Tap once to join the music. Your device chooses the audio output.</p></div><button type="button" className="small-button" onClick={() => enableAudio()} disabled={!connected}>Enable audio</button></div>}
+    {error ? <div className="player-notice" role="alert"><p>{error}</p><button type="button" className="small-button" onClick={() => setRetry((value) => value + 1)}>Retry player</button></div> : !ready ? <p className="player-note" role="status">Loading the player…</p> : !enabled && <div className="player-notice"><div><strong>Turn on sound on this device</strong><p>Tap once for this room. New songs will play automatically on this device.</p></div><button type="button" className="small-button" onClick={() => enableAudio()} disabled={!connected}>Enable audio</button></div>}
     <div className="seek-control">
       <label htmlFor="room-seek">Track position</label>
       <input id="room-seek" type="range" min="0" max={duration || 1} step="0.1" value={Math.min(Number(seekDraft ?? position), duration || 1)} disabled={!canControl || !ready || !connected || !duration} onChange={(event) => setSeekDraft(event.target.value)} onPointerUp={commitSeek} onKeyUp={commitSeek} onBlur={commitSeek} />
