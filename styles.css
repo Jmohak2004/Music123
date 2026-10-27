@@ -528,7 +528,10 @@ h1 em { color: var(--coral); font-style: normal; }
   .people-list { grid-template-columns: 1fr; }
   .hero-copy h1 { font-size: clamp(36px, 10vw, 52px); }
   .hero-description { font-size: clamp(12px, 3.5vw, 14px); }
-  .hero-actions { align-items: flex-start; flex-direction: column; gap: 14px; }
+  .hero-actions { align-items: stretch; flex-direction: row; flex-wrap: nowrap; width: 100%; gap: 8px; }
+  .hero-actions .primary-cta { flex: 1; padding: 11px 10px; font-size: 11px; gap: 4px; }
+  .final-cta-actions { width: 100%; flex-wrap: nowrap; gap: 8px; }
+  .final-cta-actions .primary-cta { flex: 1; justify-content: space-between; min-width: 0; padding: 11px 9px; font-size: 11px; }
   .hero-visual { height: clamp(260px, 75vw, 340px); }
   .visual-disc { width: clamp(180px, 45vw, 240px); height: clamp(180px, 45vw, 240px); left: 8%; top: 30px; }
   .note-top { top: 20px; right: 0; }
