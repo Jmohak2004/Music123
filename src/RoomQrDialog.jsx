@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import QRCode from "react-qr-code";
 
 export default function RoomQrDialog({ code, name, url, onClose }) {
@@ -6,6 +6,12 @@ export default function RoomQrDialog({ code, name, url, onClose }) {
   const closeRef = useRef(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
+  const [copyStatus, setCopyStatus] = useState("");
+  const localAddress = ["localhost", "127.0.0.1", "::1"].includes(new URL(url).hostname);
+  async function copyLink() {
+    try { await navigator.clipboard.writeText(url); setCopyStatus("Link copied"); }
+    catch { setCopyStatus("Use the link below to share this room."); }
+  }
   useEffect(() => {
     const previousFocus = document.activeElement;
     closeRef.current?.focus();
@@ -33,6 +39,9 @@ export default function RoomQrDialog({ code, name, url, onClose }) {
         <QRCode value={url} size={224} level="M" />
       </div>
       <p className="qr-room-code">Room code <strong>{code}</strong></p>
+      {localAddress && <p className="qr-local-note">This address only works on this device. Open Echo at a reachable address to scan from another device.</p>}
+      <button type="button" className="small-button" onClick={copyLink}>Copy join link</button>
+      {copyStatus && <p role="status">{copyStatus}</p>}
       <a className="qr-link" href={url}>{url}</a>
     </section>
   </div>;
