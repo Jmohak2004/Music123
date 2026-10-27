@@ -1,6 +1,9 @@
 export const API_BASE = import.meta.env.VITE_API_URL || "";
 
+const members = new Map();
+
 export function readMember(code) {
+  if (members.has(code)) return members.get(code);
   try {
     const stored = JSON.parse(sessionStorage.getItem(`echo.member.${code}`) || "null");
     if (stored?.token && typeof stored.token === "string") return stored;
@@ -10,7 +13,10 @@ export function readMember(code) {
 }
 
 export function saveMember(code, token, name) {
-  sessionStorage.setItem(`echo.member.${code}`, JSON.stringify({ token, name }));
+  const member = { token, name };
+  members.set(code, member);
+  try { sessionStorage.setItem(`echo.member.${code}`, JSON.stringify(member)); }
+  catch { member.temporary = true; }
 }
 
 export function parseMedia(value, type) {

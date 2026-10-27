@@ -17,8 +17,12 @@ export function useRoom(code) {
     let socket;
     let syncTimer;
     let clockKnown = false;
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15_000);
+    let controller;
+    let timeout;
+    let retryTimer;
+    let fetching = false;
+    let retryDelay = 1000;
+    let permanentFailure = false;
     const session = readMember(code);
     function acceptState(state) {
       if (disposed) return;
@@ -29,7 +33,7 @@ export function useRoom(code) {
       setRoom((current) => current && playback.revision >= current.playback.revision ? { ...current, playback } : current);
     }
     function synchronize() {
-      if (!socket.connected || !joinedRef.current) return;
+      if (!socket?.connected || !joinedRef.current) return;
       const started = Date.now();
       socket.timeout(5000).emit("room:sync", {}, (err, result) => {
         if (disposed || err || !result?.ok) return;
@@ -46,15 +50,25 @@ export function useRoom(code) {
       socket?.disconnect();
     }
     function goOnline() {
+      if (permanentFailure) return;
       if (socket && !socket.connected) socket.connect();
       else if (socket) synchronize();
+      else if (!permanentFailure) { clearTimeout(retryTimer); connect(); }
     }
     async function connect() {
+      if (disposed || fetching || permanentFailure) return;
+      fetching = true;
+      controller = new AbortController();
+      timeout = setTimeout(() => controller.abort(), 15_000);
       try {
         const response = await fetch(`${API_BASE}/api/rooms/${encodeURIComponent(code)}`, { signal: controller.signal });
         const result = await response.json();
-        if (!response.ok) throw new Error(result.error);
+        if (!response.ok) {
+          permanentFailure = response.status >= 400 && response.status < 500 && ![408, 429].includes(response.status);
+          throw new Error(result.error || "Cannot reach the room server.");
+        }
         if (disposed) return;
+        setError("");
         acceptState(result);
         if (!session) { setNeedsJoin(true); setStatus("disconnected"); return; }
         socket = io(API_BASE || undefined, { autoConnect: false });
@@ -64,10 +78,19 @@ export function useRoom(code) {
         socket.on("media:updated", acceptPlayback);
         socket.on("chat:message", (message) => setRoom((current) => current ? { ...current, messages: [...current.messages.filter((item) => item.id !== message.id).slice(-99), message] } : current));
         socket.on("connect", () => {
+          clearTimeout(retryTimer);
+          const connectionId = socket.id;
           setStatus("connecting");
           socket.timeout(5000).emit("room:join", { code, token: session.token }, (err, result) => {
-            if (disposed) return;
-            if (err || !result?.ok) {
+            if (disposed || socket.id !== connectionId) return;
+            if (err) {
+              setError("Connection interrupted. Reconnecting to your room…");
+              socket.disconnect();
+              retryTimer = setTimeout(() => { if (!disposed) socket.connect(); }, 1000);
+              return;
+            }
+            if (!result?.ok) {
+              permanentFailure = true;
               setError(result?.error || "Could not join. Please rejoin the room.");
               setNeedsJoin(true);
               setStatus("disconnected");
@@ -82,21 +105,28 @@ export function useRoom(code) {
             synchronize();
           });
         });
-        socket.on("disconnect", () => { joinedRef.current = false; setStatus("reconnecting"); });
+        socket.on("disconnect", () => { joinedRef.current = false; setStatus(permanentFailure ? "disconnected" : "reconnecting"); });
         socket.on("connect_error", () => { joinedRef.current = false; setStatus("reconnecting"); });
         socket.connect();
         syncTimer = setInterval(synchronize, 10_000);
         document.addEventListener("visibilitychange", synchronize);
-        window.addEventListener("offline", goOffline);
-        window.addEventListener("online", goOnline);
+
       } catch (err) {
-        if (!disposed) { setError(err.name === "AbortError" ? "The server took too long to respond. Please try again." : err.message || "Cannot reach the room server."); setStatus("disconnected"); }
-      } finally { clearTimeout(timeout); }
+        if (!disposed) { setError(err.name === "AbortError" ? "The server took too long to respond. Reconnecting automatically…" : err.message || "Cannot reach the room server."); setStatus("disconnected");
+          if (!permanentFailure) {
+            retryTimer = setTimeout(connect, retryDelay);
+            retryDelay = Math.min(retryDelay * 2, 10_000);
+          }
+        }
+      } finally { fetching = false; clearTimeout(timeout); }
     }
+    window.addEventListener("offline", goOffline);
+    window.addEventListener("online", goOnline);
     connect();
     return () => {
       disposed = true;
-      controller.abort();
+      controller?.abort();
+      clearTimeout(retryTimer);
       clearTimeout(timeout);
       clearInterval(syncTimer);
       document.removeEventListener("visibilitychange", synchronize);

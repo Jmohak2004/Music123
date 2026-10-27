@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useRoom } from "./useRoom";
-import { parseMedia } from "./session";
+import { parseMedia, readMember } from "./session";
 import SyncedPlayer from "./SyncedPlayer";
 
 export default function LiveRoom({ onNavigate }) {
@@ -53,6 +53,7 @@ export default function LiveRoom({ onNavigate }) {
     <div className="room-invite"><p className="route-description">Room <strong className="inline-code">{room.code}</strong> · hosted by <strong>{room.host}</strong></p><button type="button" className="small-button" onClick={copyInvite}>Copy invite</button></div>
     {copied && <p className="player-note" role="status">{copied}</p>}
     {!connected && <p className="connection-notice" role="status">Reconnecting to the room. Playback will catch up when the connection returns.</p>}
+    {readMember(code)?.temporary && <p className="room-error" role="status">Browser storage is unavailable. Keep this tab open; after a refresh, join again with your name.</p>}
     {error && <p className="form-error room-error" role="alert">{error}<button type="button" className="text-button" onClick={() => setError("")}>Dismiss</button></p>}
     <div className="live-layout"><div className="music-panel">
       <div className="panel-heading"><h2>Now playing</h2><span>{room.allowEveryone ? "Everyone can DJ" : isHost ? "You’re the host" : "Host controls playback"}</span></div>

@@ -55,6 +55,15 @@ npm run test:e2e
 npm run build
 ```
 
+The reliability checks also cover temporary initial API failure, blocked browser storage, WebSocket failure with HTTP polling fallback, and host election after a long disconnection. Run the same suite in all three browser engines with:
+
+```bash
+npx playwright install chromium firefox webkit
+ECHO_ALL_BROWSERS=1 npm run test:e2e
+```
+
+WebKit engine testing does not replace testing Safari on real Apple devices. When browser storage is blocked, the current tab retains its room session in memory; refreshing requires joining again. Temporary initial connection failures retry automatically.
+
 To use an installed Chromium/Chrome executable instead of downloading the test browser:
 
 ```bash
