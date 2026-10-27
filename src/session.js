@@ -1,5 +1,9 @@
 export const API_BASE = import.meta.env.VITE_API_URL || "";
 
+export function roomInviteUrl(code, origin = window.location.origin) {
+  return new URL(`/room/join?code=${encodeURIComponent(code)}`, origin).href;
+}
+
 const members = new Map();
 
 export function readMember(code) {
