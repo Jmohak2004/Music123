@@ -13,6 +13,7 @@ test("YouTube keeps its activated iframe across videos and source changes", asyn
       window.YT = { Player: class {
         constructor(element, options) {
           window.playerCreations++;
+          if (options.videoId) window.cuedVideos.push(options.videoId);
           this.state = 5; this.time = 0;
           this.frame = document.createElement('iframe');
           element.replaceWith(this.frame);

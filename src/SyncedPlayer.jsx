@@ -20,6 +20,7 @@ export default function SyncedPlayer({ playback, clockOffset, connected, canCont
   const audioRef = useRef(null);
   const youtubeRef = useRef(null);
   const youtubeReadyRef = useRef(false);
+  const youtubeRevisionRef = useRef(null);
   const activateYoutubeRef = useRef(null);
   const adapterRef = useRef(null);
   const latest = useRef({ playback, clockOffset, connected, isHost, onPlayback });
@@ -85,6 +86,7 @@ export default function SyncedPlayer({ playback, clockOffset, connected, canCont
     const player = youtubeRef.current;
     youtubeRef.current = null;
     youtubeReadyRef.current = false;
+    youtubeRevisionRef.current = null;
     player?.destroy();
   }, [retry]);
 
@@ -150,11 +152,14 @@ export default function SyncedPlayer({ playback, clockOffset, connected, canCont
       const activate = () => {
         if (disposed || !youtubeReadyRef.current) return;
         const player = youtubeRef.current;
-        player.cueVideoById({ videoId: media.videoId, startSeconds: playbackPosition(latest.current.playback, latest.current.clockOffset) });
+        if (youtubeRevisionRef.current !== playback.mediaRevision) {
+          player.cueVideoById({ videoId: media.videoId, startSeconds: playbackPosition(latest.current.playback, latest.current.clockOffset) });
+          youtubeRevisionRef.current = playback.mediaRevision;
+        }
         finishSetup({
           play: () => player.playVideo(), pause: () => player.pauseVideo(), seek: (time) => player.seekTo(time, true),
           position: () => player.getCurrentTime() || 0, duration: () => player.getDuration() || 0,
-          playing: () => [1, 3].includes(player.getPlayerState()), volume: (value) => { player.setVolume(value); player.unMute(); }, tolerance: 1,
+          playing: () => player.getPlayerState() === 1, volume: (value) => { player.setVolume(value); player.unMute(); }, tolerance: 1,
         });
       };
       activateYoutubeRef.current = activate;
@@ -164,6 +169,7 @@ export default function SyncedPlayer({ playback, clockOffset, connected, canCont
         const mount = document.createElement("div");
         containerRef.current.replaceChildren(mount);
         const player = new YT.Player(mount, {
+          videoId: media.videoId,
           width: "100%", height: "100%",
           playerVars: { playsinline: 1, rel: 0, controls: 0, disablekb: 1, origin: window.location.origin },
           events: {
@@ -189,6 +195,7 @@ export default function SyncedPlayer({ playback, clockOffset, connected, canCont
           },
         });
         youtubeRef.current = player;
+        youtubeRevisionRef.current = playback.mediaRevision;
       }).catch((err) => { if (!disposed) setError(err.message); });
     }
     return () => {
