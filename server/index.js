@@ -142,7 +142,7 @@ export function createEchoServer({ hostGraceMs = 15_000 } = {}) {
       const room = socketRoom(socket);
       if (!canControl(room, socket)) return reply({ ok: false, error: "Only the host can choose music unless shared controls are enabled." });
       const media = validateMedia(payload.media || { type: "youtube", videoId: payload.videoId });
-      if (!media) return reply({ ok: false, error: "Use a valid YouTube link or a direct HTTPS audio link." });
+      if (!media) return reply({ ok: false, error: "Use a valid public media link." });
       changePlayback(room, { media, videoId: media.videoId || null, playing: false, position: 0, mediaRevision: room.playback.mediaRevision + 1 }, "media:updated");
       reply({ ok: true });
     });
@@ -207,10 +207,13 @@ function cleanText(value, maxLength) { return typeof value === "string" ? value.
 function normalizeCode(value) { return typeof value === "string" ? value.trim().toUpperCase() : ""; }
 function validateMedia(media) {
   if (media?.type === "youtube" && typeof media.videoId === "string" && /^[\w-]{11}$/.test(media.videoId)) return { type: "youtube", videoId: media.videoId };
-  if (media?.type === "audio" && typeof media.url === "string" && media.url.length <= 2048) {
+  if (media?.type === "vimeo" && typeof media.videoId === "string" && /^\d{1,15}$/.test(media.videoId) && (!media.hash || typeof media.hash === "string" && /^[\da-f]{6,64}$/i.test(media.hash))) {
+    return { type: "vimeo", videoId: media.videoId, ...(media.hash ? { hash: media.hash } : {}) };
+  }
+  if (["audio", "video"].includes(media?.type) && typeof media.url === "string" && media.url.length <= 2048) {
     try {
       const url = new URL(media.url);
-      if (url.protocol === "https:" && !url.username && !url.password) return { type: "audio", url: url.href, title: cleanText(media.title, 100) || "Shared audio" };
+      if (url.protocol === "https:" && !url.username && !url.password) return { type: media.type, url: url.href, title: cleanText(media.title, 100) || (media.type === "video" ? "Shared video" : "Shared audio") };
     } catch { /* Invalid links are rejected below. */ }
   }
   return null;

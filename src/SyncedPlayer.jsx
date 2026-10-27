@@ -17,7 +17,11 @@ function loadYouTube() {
 
 export default function SyncedPlayer({ playback, clockOffset, connected, canControl, isHost, onPlayback }) {
   const containerRef = useRef(null);
-  const audioRef = useRef(null);
+  const mediaRef = useRef(null);
+  const vimeoContainerRef = useRef(null);
+  const vimeoRef = useRef(null);
+  const vimeoRevisionRef = useRef(null);
+  const vimeoStateRef = useRef({ position: 0, duration: 0, playing: false });
   const youtubeRef = useRef(null);
   const youtubeReadyRef = useRef(false);
   const youtubeRevisionRef = useRef(null);
@@ -38,6 +42,7 @@ export default function SyncedPlayer({ playback, clockOffset, connected, canCont
   const [seekDraft, setSeekDraft] = useState(null);
   const [retry, setRetry] = useState(0);
   const [buffering, setBuffering] = useState(false);
+  const [needsUnmute, setNeedsUnmute] = useState(false);
 
   function blockAudio() { enabledRef.current = false; setEnabled(false); }
   function play(adapter) {
@@ -80,7 +85,7 @@ export default function SyncedPlayer({ playback, clockOffset, connected, canCont
     setDuration(total);
   };
 
-  // Keep the same iframe (and its audio permission) throughout the room session.
+  // Keep embedded players and their audio permission throughout the room session.
   // Only an explicit player retry or leaving the room destroys it.
   useEffect(() => () => {
     const player = youtubeRef.current;
@@ -88,6 +93,10 @@ export default function SyncedPlayer({ playback, clockOffset, connected, canCont
     youtubeReadyRef.current = false;
     youtubeRevisionRef.current = null;
     player?.destroy();
+    const vimeo = vimeoRef.current;
+    vimeoRef.current = null;
+    vimeoRevisionRef.current = null;
+    vimeo?.destroy();
   }, [retry]);
 
   useEffect(() => {
@@ -99,6 +108,7 @@ export default function SyncedPlayer({ playback, clockOffset, connected, canCont
     setDuration(0);
     setSeekDraft(null);
     setBuffering(false);
+    setNeedsUnmute(false);
     pendingPlay.current = false;
     const media = playback.media;
     if (!media) return;
@@ -114,9 +124,10 @@ export default function SyncedPlayer({ playback, clockOffset, connected, canCont
     function ended() {
       if (!disposed) void reportEnded();
     }
-    let cleanupAudio = () => {};
-    if (media.type === "audio") {
-      const audio = audioRef.current;
+    let cleanupNative = () => {};
+    if (media.type === "audio" || media.type === "video") {
+      const audio = mediaRef.current;
+      let hls;
       const onReady = () => finishSetup({
         play: () => audio.play(), pause: () => audio.pause(), seek: (time) => {
           // A source may not expose seek ranges until it has buffered enough data.
@@ -128,7 +139,7 @@ export default function SyncedPlayer({ playback, clockOffset, connected, canCont
         position: () => audio.currentTime, duration: () => Number.isFinite(audio.duration) ? audio.duration : 0,
         playing: () => !audio.paused && !audio.ended, volume: (value) => { audio.volume = value / 100; }, tolerance: 0.4,
       });
-      const onError = () => { if (!disposed) { adapterRef.current = null; setError("This audio link is unavailable or unsupported. Use a direct MP3, WAV, OGG, or M4A link that everyone can access."); setReady(false); } };
+      const onError = () => { if (!disposed) { adapterRef.current = null; setError(media.type === "video" ? "This video link cannot play here. Use a public video file or playable stream." : "This audio link is unavailable or unsupported. Use a direct MP3, WAV, OGG, or M4A link that everyone can access."); setReady(false); } };
       const waiting = () => setBuffering(true);
       const playing = () => setBuffering(false);
       audio.addEventListener("loadedmetadata", onReady);
@@ -136,9 +147,21 @@ export default function SyncedPlayer({ playback, clockOffset, connected, canCont
       audio.addEventListener("ended", ended);
       audio.addEventListener("waiting", waiting);
       audio.addEventListener("playing", playing);
-      audio.src = media.url;
-      audio.load();
-      cleanupAudio = () => {
+      if (media.type === "video" && /\.m3u8$/i.test(new URL(media.url).pathname) && !audio.canPlayType("application/vnd.apple.mpegurl")) {
+        import("hls.js").then(({ default: Hls }) => {
+          if (disposed) return;
+          if (!Hls.isSupported()) { onError(); return; }
+          hls = new Hls();
+          hls.on(Hls.Events.ERROR, (_, data) => { if (data.fatal) onError(); });
+          hls.loadSource(media.url);
+          hls.attachMedia(audio);
+        }).catch(onError);
+      } else {
+        audio.src = media.url;
+        audio.load();
+      }
+      cleanupNative = () => {
+        hls?.destroy();
         audio.removeEventListener("loadedmetadata", onReady);
         audio.removeEventListener("error", onError);
         audio.removeEventListener("ended", ended);
@@ -148,7 +171,7 @@ export default function SyncedPlayer({ playback, clockOffset, connected, canCont
         audio.removeAttribute("src");
         audio.load();
       };
-    } else {
+    } else if (media.type === "youtube") {
       const activate = () => {
         if (disposed || !youtubeReadyRef.current) return;
         const player = youtubeRef.current;
@@ -197,13 +220,62 @@ export default function SyncedPlayer({ playback, clockOffset, connected, canCont
         youtubeRef.current = player;
         youtubeRevisionRef.current = playback.mediaRevision;
       }).catch((err) => { if (!disposed) setError(err.message); });
+    } else if (media.type === "vimeo") {
+      import("@vimeo/player").then(async ({ default: VimeoPlayer }) => {
+        if (disposed) return;
+        let player = vimeoRef.current;
+        if (!player) {
+          const mount = document.createElement("div");
+          vimeoContainerRef.current.replaceChildren(mount);
+          player = new VimeoPlayer(mount, {
+            ...(media.hash ? { url: `https://vimeo.com/${media.videoId}?h=${media.hash}` } : { id: Number(media.videoId) }),
+            responsive: true, controls: true, autopause: false,
+          });
+          vimeoRef.current = player;
+          vimeoRevisionRef.current = playback.mediaRevision;
+          player.on("timeupdate", ({ seconds, duration }) => { vimeoStateRef.current.position = seconds; vimeoStateRef.current.duration = duration; });
+          player.on("play", () => { vimeoStateRef.current.playing = true; setBuffering(false); });
+          player.on("pause", () => { vimeoStateRef.current.playing = false; });
+          player.on("bufferstart", () => setBuffering(true));
+          player.on("bufferend", () => setBuffering(false));
+          const refreshMute = () => player.getMuted().then((muted) => {
+            if (latest.current.playback.media?.type === "vimeo") setNeedsUnmute(Boolean(muted) && enabledRef.current);
+          }).catch(() => {});
+          player.on("playing", refreshMute);
+          player.on("volumechange", refreshMute);
+          player.on("ended", ended);
+          player.on("error", () => { if (latest.current.playback.media?.type === "vimeo") { adapterRef.current = null; setReady(false); setError("This Vimeo video is unavailable or does not allow embedding."); } });
+        }
+        await player.ready();
+        if (disposed) return;
+        if (vimeoRevisionRef.current !== playback.mediaRevision) {
+          await player.loadVideo(media.hash ? { url: `https://vimeo.com/${media.videoId}?h=${media.hash}` } : Number(media.videoId));
+          vimeoRevisionRef.current = playback.mediaRevision;
+        }
+        if (disposed) return;
+        const [duration, position, paused] = await Promise.all([player.getDuration(), player.getCurrentTime(), player.getPaused()]);
+        if (disposed) return;
+        vimeoStateRef.current = { duration, position, playing: !paused };
+        finishSetup({
+          play: async () => { await player.play(); await player.setMuted(false).catch(() => {}); },
+          pause: () => { vimeoStateRef.current.playing = false; player.pause().catch(() => {}); },
+          seek: (time) => { vimeoStateRef.current.position = time; player.setCurrentTime(time).catch(() => {}); },
+          position: () => vimeoStateRef.current.position, duration: () => vimeoStateRef.current.duration,
+          playing: () => vimeoStateRef.current.playing,
+          volume: (value) => { player.setVolume(value / 100).catch(() => {}); player.setMuted(false).catch(() => {}); }, tolerance: 1,
+          refreshMute: () => player.getMuted().then((muted) => {
+            if (vimeoRef.current === player && latest.current.playback.media?.type === "vimeo") setNeedsUnmute(Boolean(muted));
+          }).catch(() => {}),
+        });
+      }).catch(() => { if (!disposed) setError("This Vimeo video is unavailable or does not allow embedding."); });
     }
     return () => {
       disposed = true;
       if (adapterRef.current === adapter) adapterRef.current = null;
-      cleanupAudio();
+      cleanupNative();
       activateYoutubeRef.current = null;
       if (youtubeReadyRef.current) youtubeRef.current?.pauseVideo();
+      vimeoRef.current?.pause().catch(() => {});
     };
   // Load the next source into the existing elements to retain audio activation.
   }, [playback.mediaRevision, retry]);
@@ -224,6 +296,7 @@ export default function SyncedPlayer({ playback, clockOffset, connected, canCont
     adapter.volume(volumeRef.current);
     // Call play inside the click handler so mobile browsers see a user gesture.
     play(adapter);
+    if (adapter.refreshMute) setTimeout(adapter.refreshMute, 700);
     if (!startRoom && !playback.playing) adapter.pause();
   }
   async function togglePlayback() {
@@ -239,12 +312,14 @@ export default function SyncedPlayer({ playback, clockOffset, connected, canCont
     if (seekDraft !== null) { onPlayback("seek", Number(seekDraft)); setSeekDraft(null); }
   }
 
-  if (!playback.media) return <div className="youtube-empty"><span className="empty-note">♫</span><strong>The room is ready for music.</strong><p>{canControl ? "Add a YouTube or direct audio link to get started." : "Your host will choose the first track."}</p></div>;
+  if (!playback.media) return <div className="youtube-empty"><span className="empty-note">♫</span><strong>The room is ready for music.</strong><p>{canControl ? "Add a link to get started." : "Your host will choose the first track."}</p></div>;
   return <section className="shared-player" aria-label="Shared music player">
     <div className="youtube-player-wrap" ref={containerRef} hidden={playback.media.type !== "youtube"} />
+    <div className="vimeo-player-wrap" ref={vimeoContainerRef} hidden={playback.media.type !== "vimeo"} />
     {playback.media.type === "audio" && <div className="audio-art"><span aria-hidden="true">♫</span><div><small>NOW IN THE ROOM</small><h2>{playback.media.title}</h2><p>One track. Every device.</p></div></div>}
-    <audio ref={audioRef} preload="auto" />
+    <video ref={mediaRef} className={playback.media.type === "video" ? "room-video" : "room-audio-media"} aria-hidden={playback.media.type !== "video"} preload="auto" playsInline />
     {error ? <div className="player-notice" role="alert"><p>{error}</p><button type="button" className="small-button" onClick={() => setRetry((value) => value + 1)}>Retry player</button></div> : !ready ? <p className="player-note" role="status">Loading the player…</p> : !enabled && <div className="player-notice"><div><strong>Turn on sound on this device</strong><p>Tap once for this room. New songs will play automatically on this device.</p></div><button type="button" className="small-button" onClick={() => enableAudio()} disabled={!connected}>Enable audio</button></div>}
+    {needsUnmute && playback.media.type === "vimeo" && <p className="player-note" role="status">Tap the video player’s sound control to hear this video on your device.</p>}
     <div className="seek-control">
       <label htmlFor="room-seek">Track position</label>
       <input id="room-seek" type="range" min="0" max={duration || 1} step="0.1" value={Math.min(Number(seekDraft ?? position), duration || 1)} disabled={!canControl || !ready || !connected || !duration} onChange={(event) => setSeekDraft(event.target.value)} onPointerUp={commitSeek} onKeyUp={commitSeek} onBlur={commitSeek} />

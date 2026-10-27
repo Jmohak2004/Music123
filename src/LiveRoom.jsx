@@ -7,7 +7,7 @@ import RoomQrDialog from "./RoomQrDialog";
 export default function LiveRoom({ onNavigate }) {
   const code = window.location.pathname.split("/").pop().toUpperCase();
   const { room, participantId, status, error, setError, needsJoin, clockOffset, command } = useRoom(code);
-  const [mediaType, setMediaType] = useState("youtube");
+  const [mediaType, setMediaType] = useState("auto");
   const [mediaUrl, setMediaUrl] = useState("");
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
@@ -23,7 +23,7 @@ export default function LiveRoom({ onNavigate }) {
   async function loadMedia(event) {
     event.preventDefault();
     const media = parseMedia(mediaUrl, mediaType);
-    if (!media) { setError(mediaType === "youtube" ? "Paste a valid YouTube video link." : "Paste a direct HTTPS audio link."); return; }
+    if (!media) { setError(mediaType === "youtube" ? "Paste a valid YouTube video link." : mediaType === "audio" ? "Paste a direct HTTPS audio link." : "Paste a valid public media link."); return; }
     setBusy(true);
     if (await command("media:update", { media })) setMediaUrl("");
     setBusy(false);
@@ -62,8 +62,8 @@ export default function LiveRoom({ onNavigate }) {
     <div className="live-layout"><div className="music-panel">
       <div className="panel-heading"><h2>Now playing</h2><span>{room.allowEveryone ? "Everyone can DJ" : isHost ? "You’re the host" : "Host controls playback"}</span></div>
       {canControl && <form className="youtube-form" onSubmit={loadMedia}>
-        <label htmlFor="media-type">Music source</label><select id="media-type" value={mediaType} onChange={(event) => setMediaType(event.target.value)} disabled={!connected}><option value="youtube">YouTube</option><option value="audio">Direct audio link</option></select>
-        <label htmlFor="music-url">{mediaType === "youtube" ? "YouTube video link" : "Direct audio link"}</label><div><input id="music-url" type="url" value={mediaUrl} onChange={(event) => setMediaUrl(event.target.value)} placeholder={mediaType === "youtube" ? "https://youtube.com/watch?v=..." : "https://example.com/song.mp3"} maxLength="2048" required disabled={!connected || busy} /><button type="submit" disabled={!connected || busy}>{busy ? "Loading…" : "Load music"}</button></div>
+        <label htmlFor="media-type">Music source</label><select id="media-type" value={mediaType} onChange={(event) => setMediaType(event.target.value)} disabled={!connected}><option value="auto">Automatic</option><option value="youtube">YouTube</option><option value="video">Video link</option><option value="audio">Direct audio link</option></select>
+        <label htmlFor="music-url">{mediaType === "youtube" ? "YouTube video link" : mediaType === "audio" ? "Direct audio link" : mediaType === "video" ? "Video link" : "Link"}</label><div><input id="music-url" type="url" value={mediaUrl} onChange={(event) => setMediaUrl(event.target.value)} placeholder={mediaType === "youtube" ? "https://youtube.com/watch?v=..." : mediaType === "audio" ? "https://example.com/song.mp3" : mediaType === "video" ? "https://example.com/video.mp4" : "https://example.com/video-or-song"} maxLength="2048" required disabled={!connected || busy} /><button type="submit" disabled={!connected || busy}>{busy ? "Loading…" : "Load music"}</button></div>
         {mediaType === "audio" && <p className="player-note">Use a public MP3, WAV, OGG, or M4A file link. Streaming-service page links won’t play here.</p>}
       </form>}
       <SyncedPlayer playback={room.playback} clockOffset={clockOffset} connected={connected} canControl={canControl} isHost={isHost} onPlayback={updatePlayback} />

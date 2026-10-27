@@ -94,6 +94,27 @@ test("play, pause and seek reach every client, including the sender", async () =
   assert.ok(paused.position >= 42);
 });
 
+test("video and Vimeo sources share the same room timeline and permission checks", async () => {
+  const { room, host } = await createRoom();
+  const guest = await join(room);
+  const video = { type: "video", url: "https://media.example.com/movie.mp4?token=public", title: "Movie" };
+  assert.equal((await command(guest.socket, "media:update", { media: video })).ok, true);
+  let playback = (await state(host)).playback;
+  assert.deepEqual(playback.media, video);
+  assert.equal((await command(host, "playback:update", { action: "play", mediaRevision: playback.mediaRevision })).ok, true);
+  assert.equal((await state(guest.socket)).playback.playing, true);
+  assert.equal((await command(guest.socket, "media:update", { media: { type: "vimeo", videoId: "76979871" } })).ok, true);
+  playback = (await state(host)).playback;
+  assert.deepEqual(playback.media, { type: "vimeo", videoId: "76979871" });
+  assert.equal(playback.playing, false);
+  assert.equal((await command(host, "playback:update", { action: "play", mediaRevision: playback.mediaRevision })).ok, true);
+  await command(host, "room:settings", { allowEveryone: false });
+  assert.equal((await command(guest.socket, "media:update", { media: video })).ok, false);
+  for (const media of [{ type: "video", url: "http://media.example.com/movie.mp4" }, { type: "vimeo", videoId: "../../secret" }]) {
+    assert.equal((await command(host, "media:update", { media })).ok, false);
+  }
+});
+
 test("late joins receive a running server timeline and chat history", async () => {
   const { room, host } = await createRoom();
   const mediaRevision = await load(host);

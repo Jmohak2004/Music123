@@ -90,16 +90,16 @@ test("one audio activation follows multiple host song changes without listener c
     await page.getByRole("button", { name: "Play together" }).click();
     await guest.getByRole("button", { name: "Enable audio" }).click();
     await expect.poll(async () => (await audioState(guest)).time).toBeGreaterThan(0.4);
-    await guest.locator("audio").evaluate((element) => { window.originalRoomAudio = element; });
+    await guest.locator("video.room-audio-media").evaluate((element) => { window.originalRoomAudio = element; });
     for (const track of ["second", "third"]) {
       await page.getByLabel("Direct audio link", { exact: true }).fill(`https://audio.echo.test/${track}.wav`);
       await page.getByRole("button", { name: "Load music" }).click();
-      await expect(guest.locator("audio")).toHaveAttribute("src", `https://audio.echo.test/${track}.wav`);
+      await expect(guest.locator("video.room-audio-media")).toHaveAttribute("src", `https://audio.echo.test/${track}.wav`);
       await page.getByRole("button", { name: "Play together" }).click();
       await expect.poll(async () => (await audioState(guest)).time).toBeGreaterThan(0.4);
       await expect.poll(async () => (await audioState(guest)).paused).toBe(false);
       await expect(guest.getByRole("button", { name: "Enable audio" })).toHaveCount(0);
-      expect(await guest.locator("audio").evaluate((element) => element === window.originalRoomAudio)).toBe(true);
+      expect(await guest.locator("video.room-audio-media").evaluate((element) => element === window.originalRoomAudio)).toBe(true);
     }
   } finally { await guestContext.close(); }
 });
@@ -190,9 +190,10 @@ test("direct room visits ask for a name and invalid links show useful errors", a
     await expect(visitor.getByRole("button", { name: "Join this room" })).toBeVisible();
     await visitor.getByRole("button", { name: "Join this room" }).click();
     await expect(visitor.getByLabel("Room code")).toHaveValue(code);
-    await page.getByLabel("YouTube video link").fill("https://notyoutube.com/watch?v=M7lc1UVf-VE");
+    await page.route("https://notyoutube.com/**", (route) => route.fulfill({ contentType: "text/html", body: "<html>Not a video file</html>" }));
+    await page.getByLabel("Link", { exact: true }).fill("https://notyoutube.com/watch?v=M7lc1UVf-VE");
     await page.getByRole("button", { name: "Load music" }).click();
-    await expect(page.getByRole("alert")).toContainText("valid YouTube");
+    await expect(page.getByRole("alert")).toContainText("cannot play here");
   } finally { await visitorContext.close(); }
 });
 
@@ -252,7 +253,7 @@ test("YouTube unavailable-video errors leave room controls usable", async ({ pag
     window.onYouTubeIframeAPIReady();
   ` }));
   await create(page);
-  await page.getByLabel("YouTube video link").fill("https://youtu.be/M7lc1UVf-VE");
+  await page.getByLabel("Link", { exact: true }).fill("https://youtu.be/M7lc1UVf-VE");
   await page.getByRole("button", { name: "Load music" }).click();
   await expect(page.getByRole("alert")).toContainText("cannot play in an embedded player");
   await expect(page.getByRole("button", { name: "Play together" })).toBeDisabled();
@@ -278,7 +279,7 @@ if (process.env.ECHO_LIVE_YOUTUBE === "1") {
     try {
       const code = await create(page);
       await join(guest, code, "Ravi");
-      await page.getByLabel("YouTube video link").fill("https://youtu.be/M7lc1UVf-VE");
+      await page.getByLabel("Link", { exact: true }).fill("https://youtu.be/M7lc1UVf-VE");
       await page.getByRole("button", { name: "Load music" }).click();
       await expect(page.getByRole("button", { name: "Play together" })).toBeEnabled({ timeout: 30_000 });
       await expect(guest.getByRole("button", { name: "Enable audio" })).toBeEnabled({ timeout: 30_000 });
@@ -293,7 +294,7 @@ if (process.env.ECHO_LIVE_YOUTUBE === "1") {
         return times.every(Number.isFinite) ? Math.abs(times[0] - times[1]) : Infinity;
       }).toBeLessThan(1.5);
       await guest.locator(".youtube-player-wrap iframe").evaluate((element) => { window.originalRoomIframe = element; });
-      await page.getByLabel("YouTube video link").fill("https://youtu.be/aqz-KE-bpKQ");
+      await page.getByLabel("Link", { exact: true }).fill("https://youtu.be/aqz-KE-bpKQ");
       await page.getByRole("button", { name: "Load music" }).click();
       await expect(page.getByRole("button", { name: "Play together" })).toBeEnabled();
       await page.getByRole("button", { name: "Play together" }).click();

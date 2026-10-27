@@ -42,6 +42,6 @@ export async function loadAudio(page) {
   await expect(page.getByRole("button", { name: "Play together" })).toBeEnabled();
 }
 export async function audioState(page) {
-  return page.locator("audio").evaluate((audio) => ({ paused: audio.paused, time: audio.currentTime, volume: audio.volume, duration: audio.duration, readyState: audio.readyState, seeking: audio.seeking, buffered: Array.from({ length: audio.buffered.length }, (_, i) => [audio.buffered.start(i), audio.buffered.end(i)]), seekable: Array.from({ length: audio.seekable.length }, (_, i) => [audio.seekable.start(i), audio.seekable.end(i)]), now: Date.now() }));
+  return page.locator("video.room-audio-media").evaluate((audio) => ({ paused: audio.paused, time: audio.currentTime, volume: audio.volume, duration: audio.duration, readyState: audio.readyState, seeking: audio.seeking, buffered: Array.from({ length: audio.buffered.length }, (_, i) => [audio.buffered.start(i), audio.buffered.end(i)]), seekable: Array.from({ length: audio.seekable.length }, (_, i) => [audio.seekable.start(i), audio.seekable.end(i)]), now: Date.now() }));
 }
 
