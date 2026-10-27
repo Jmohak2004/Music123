@@ -376,6 +376,7 @@ h1 em { color: var(--coral); font-style: normal; }
 .live-room-card h1 { font-size: clamp(28px, 4.5vw, 52px); overflow-wrap: anywhere; margin-bottom: var(--space-sm); }
 .room-topline, .room-invite, .panel-heading { display: flex; align-items: center; justify-content: space-between; gap: clamp(10px, 1.5vw, 14px); flex-wrap: wrap; }
 .room-invite { margin-bottom: clamp(14px, 2.5vw, 22px); }
+.room-invite-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .room-invite .route-description { margin: 0; max-width: none; }
 .room-connection { display: inline-flex; align-items: center; gap: 7px; color: #8b7351; font: 10px var(--mono); white-space: nowrap; }
 .room-connection > span { width: 6px; height: 6px; border-radius: 50%; background: #bf8b40; transition: background var(--dur-base); }

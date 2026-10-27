@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import QRCode from "react-qr-code";
 
-export default function RoomQrDialog({ code, name, url, onClose }) {
+export default function RoomQrDialog({ code, name, url, returnFocusRef, onClose }) {
   const dialogRef = useRef(null);
   const closeRef = useRef(null);
   const onCloseRef = useRef(onClose);
@@ -13,7 +13,7 @@ export default function RoomQrDialog({ code, name, url, onClose }) {
     catch { setCopyStatus("Use the link below to share this room."); }
   }
   useEffect(() => {
-    const previousFocus = document.activeElement;
+    const previousFocus = returnFocusRef.current || document.activeElement;
     closeRef.current?.focus();
     function onKeyDown(event) {
       if (event.key === "Escape") { onCloseRef.current(); return; }

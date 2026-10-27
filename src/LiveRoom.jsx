@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRoom } from "./useRoom";
 import { parseMedia, readMember, roomInviteUrl } from "./session";
 import SyncedPlayer from "./SyncedPlayer";
@@ -13,6 +13,7 @@ export default function LiveRoom({ onNavigate }) {
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState("");
   const [showQr, setShowQr] = useState(false);
+  const qrTriggerRef = useRef(null);
   const [pendingControls, setPendingControls] = useState(null);
   const connected = status === "connected";
   const isHost = Boolean(participantId && room?.hostId === participantId);
@@ -53,7 +54,7 @@ export default function LiveRoom({ onNavigate }) {
   return <section className="route-card live-room-card">
     <div className="room-topline"><span className="section-label">Your shared listening room</span><span className={`room-connection ${connected ? "is-connected" : ""}`} role="status"><span />{connected ? "Connected" : status === "reconnecting" ? "Reconnecting…" : "Connecting…"}</span></div>
     <h1>{room.name}</h1>
-    <div className="room-invite"><p className="route-description">Room <strong className="inline-code">{room.code}</strong> · hosted by <strong>{room.host}</strong></p><div className="room-invite-actions"><button type="button" className="small-button" onClick={copyInvite}>Copy invite</button><button type="button" className="small-button" onClick={() => setShowQr(true)}>Show QR code</button></div></div>
+    <div className="room-invite"><p className="route-description">Room <strong className="inline-code">{room.code}</strong> · hosted by <strong>{room.host}</strong></p><div className="room-invite-actions"><button type="button" className="small-button" onClick={copyInvite}>Copy invite</button><button ref={qrTriggerRef} type="button" className="small-button" onClick={() => setShowQr(true)}>Show QR code</button></div></div>
     {copied && <p className="player-note" role="status">{copied}</p>}
     {!connected && <p className="connection-notice" role="status">Reconnecting to the room. Playback will catch up when the connection returns.</p>}
     {readMember(code)?.temporary && <p className="room-error" role="status">Browser storage is unavailable. Keep this tab open; after a refresh, join again with your name.</p>}
@@ -74,6 +75,6 @@ export default function LiveRoom({ onNavigate }) {
       <button type="button" className="leave-room-button" onClick={leave}>Leave room <span aria-hidden="true">↗</span></button>
     </aside></div>
     <section className="room-conversation" aria-label="Room chat"><div className="panel-heading"><h2>Room chat</h2><span>Say it with the music</span></div><div className="room-messages" role="log" aria-label="Messages">{room.messages.length ? room.messages.map((message) => <p key={message.id}><strong>{message.author}</strong> {message.text}</p>) : <p>No messages yet. Say hello to your people.</p>}</div><form className="room-chat-form" onSubmit={sendMessage}><input aria-label="Message to the room" value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Say something to the room…" maxLength="500" disabled={!connected} /><button type="submit" disabled={!connected || !draft.trim()}>Send</button></form></section>
-    {showQr && <RoomQrDialog code={room.code} name={room.name} url={inviteUrl} onClose={() => setShowQr(false)} />}
+    {showQr && <RoomQrDialog code={room.code} name={room.name} url={inviteUrl} returnFocusRef={qrTriggerRef} onClose={() => setShowQr(false)} />}
   </section>;
 }
