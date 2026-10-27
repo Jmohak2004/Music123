@@ -47,7 +47,7 @@ The integration suite starts an isolated server on an unused port, connects real
 npm run test:integration
 ```
 
-Browser tests start their own API and Vite servers on ports 3015 and 5175. They exercise separate browser sessions, actual decoded WAV playback, play/pause/seek, host transfer, shared controls, chat, refresh, network loss/reconnect, late joining, device-clock differences, media replacement, track restart, and a mobile viewport. The WAV response is supplied by the test with HTTP byte-range support. The YouTube error-path test substitutes its iframe API; live YouTube streaming and physical audio output are not covered by the automated suite.
+Browser tests start their own API and Vite servers on ports 3015 and 5175. They exercise separate browser sessions, actual decoded WAV playback, play/pause/seek, host transfer, shared controls, chat, refresh, network loss/reconnect, late joining, device-clock differences, media replacement, track restart, and a mobile viewport. A three-person scenario checks that a guest can load and start music before becoming host. The WAV response is supplied by the test with HTTP byte-range support; the YouTube error-path test substitutes its iframe API.
 
 ```bash
 npx playwright install chromium
@@ -60,6 +60,25 @@ To use an installed Chromium/Chrome executable instead of downloading the test b
 ```bash
 ECHO_BROWSER_PATH='/path/to/chrome' npm run test:e2e
 ```
+
+To verify a deployed frontend and its configured API, set `ECHO_LIVE_FRONTEND`.
+These checks create temporary listening rooms on that service:
+
+```bash
+ECHO_LIVE_FRONTEND=https://your-echo-domain.example npm run test:e2e -- --grep 'a guest starts music'
+```
+
+The real YouTube check is opt-in because video availability and playback can
+depend on the network, region, and YouTube's policies. It checks that unmuted
+video elements play in two independent sessions, stay close in time, and pause
+together:
+
+```bash
+ECHO_LIVE_YOUTUBE=1 ECHO_LIVE_FRONTEND=https://your-echo-domain.example npm run test:e2e -- --grep 'live YouTube audio'
+```
+
+Physical speakers, Bluetooth output latency, and device-specific background
+playback still require checks on the target hardware.
 
 ## Deployment
 

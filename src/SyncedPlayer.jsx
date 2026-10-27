@@ -23,6 +23,7 @@ export default function SyncedPlayer({ playback, clockOffset, connected, canCont
   latest.current = { playback, clockOffset, connected, isHost, onPlayback };
   const enabledRef = useRef(false);
   const pendingPlay = useRef(false);
+  const reportedEndRef = useRef(null);
   const volumeRef = useRef(80);
   const [enabled, setEnabled] = useState(false);
   const [ready, setReady] = useState(false);
@@ -46,6 +47,16 @@ export default function SyncedPlayer({ playback, clockOffset, connected, canCont
       }).finally(() => { if (adapterRef.current === adapter) pendingPlay.current = false; });
     } catch { pendingPlay.current = false; blockAudio(); }
   }
+  async function reportEnded() {
+    const state = latest.current;
+    const revision = state.playback.revision;
+    if (!state.connected || !state.isHost || !state.playback.playing || reportedEndRef.current === revision) return;
+    // The host owns the room timeline even if their local audio is disabled.
+    // Deduplicate the timer and native ended event for the same playback state.
+    reportedEndRef.current = revision;
+    const success = await state.onPlayback("pause");
+    if (!success && reportedEndRef.current === revision) reportedEndRef.current = null;
+  }
   const syncRef = useRef(null);
   syncRef.current = (force = false) => {
     const adapter = adapterRef.current;
@@ -56,7 +67,9 @@ export default function SyncedPlayer({ playback, clockOffset, connected, canCont
     // Pause locally while offline; a fresh server snapshot resumes at the room time.
     if (!state.connected) { adapter.pause(); return; }
     if (Math.abs(adapter.position() - target) > (force ? 0.1 : adapter.tolerance)) adapter.seek(target);
-    if (state.playback.playing && enabledRef.current && !(total > 0 && target >= total)) {
+    const finished = total > 0 && target >= total;
+    if (finished) void reportEnded();
+    if (state.playback.playing && enabledRef.current && !finished) {
       if (!adapter.playing()) play(adapter);
     } else if (adapter.playing()) adapter.pause();
     setPosition(adapter.position());
@@ -86,8 +99,7 @@ export default function SyncedPlayer({ playback, clockOffset, connected, canCont
       syncRef.current(true);
     }
     function ended() {
-      const state = latest.current;
-      if (!disposed && state.connected && state.isHost && state.playback.playing) state.onPlayback("pause");
+      if (!disposed) void reportEnded();
     }
     let cleanupAudio = () => {};
     if (media.type === "audio") {

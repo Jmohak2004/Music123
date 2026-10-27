@@ -116,6 +116,11 @@ test("host transfer is immediate and persists after reconnecting the old host", 
   assert.equal((await command(host, "host:transfer", { participantId: "missing" })).ok, false);
   assert.equal((await command(host, "host:transfer", { participantId: guest.participantId })).ok, true);
   assert.equal((await state(host)).host, "Listener");
+  assert.equal((await command(host, "host:transfer", { participantId: room.participantId })).ok, false);
+  assert.equal((await command(host, "room:settings", { allowEveryone: false })).ok, false);
+  // Everyone can still play until the new host chooses host-only controls.
+  assert.equal((await command(host, "playback:update", { action: "play", mediaRevision })).ok, true);
+  assert.equal((await command(guest.socket, "room:settings", { allowEveryone: false })).ok, true);
   assert.equal((await command(host, "playback:update", { action: "play", mediaRevision })).ok, false);
   assert.equal((await command(guest.socket, "playback:update", { action: "play", mediaRevision })).ok, true);
   host.disconnect();
