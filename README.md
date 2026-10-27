@@ -5,6 +5,8 @@ A shared listening room: create a room, invite friends, choose music, and hear i
 ## What works
 
 - Room codes and shareable invite links, with named listeners and room chat.
+- Side-by-side **Make a room** and **Join a room** buttons on desktop and phones.
+- Every room has **Show QR code** beside **Copy invite**. Scanning opens that room's join page with its code filled in; the new listener enters a name to join. The code is generated in the browser and contains the public invite URL, never a participant credential.
 - Anyone in the room can choose a track, play, pause, and seek for everyone. The host can turn off **Let everyone control music** to restrict playback controls to the host.
 - **Make host** immediately hands hosting to another connected listener; the previous host becomes a listener. Only the current host can transfer hosting or change the shared controls setting.
 - YouTube links (including Music, Shorts, and short links) and public direct HTTPS audio links. Audio formats depend on the device/browser; MP3 and WAV are good starting points. Spotify/Apple Music webpage URLs and DRM-protected content are not direct audio links.
@@ -31,8 +33,8 @@ npm run dev -- --host 0.0.0.0
 
 Open `http://localhost:5173`. To test on phones on the same Wi-Fi, open `http://YOUR_COMPUTER_LAN_IP:5173` on each phone. Keep the backend running on port 3000; Vite proxies API and Socket.IO requests. Use separate browser profiles or devices for separate people. Refreshing a tab retains that person's session.
 
-1. Create a room and copy its invite or share the room code.
-2. Each friend joins with a name.
+1. Create a room and copy its invite, share the room code, or show its QR code.
+2. Friends can scan the QR code with another device, or open the invite link. The room code is filled in; each friend enters a name to join.
 3. Any room member loads a YouTube link or a public direct audio-file URL.
 4. Each listener enables audio; anyone presses **Play together**.
 5. Anyone can pick the next song. Use **Make host** to hand host duties to another listener, or turn off shared controls to keep playback host-only.
@@ -48,6 +50,8 @@ npm run test:integration
 ```
 
 Browser tests start their own API and Vite servers on ports 3015 and 5175. They exercise separate browser sessions, actual decoded WAV playback, play/pause/seek, host transfer, shared controls, chat, refresh, network loss/reconnect, late joining, device-clock differences, media replacement, track restart, and a mobile viewport. A three-person scenario checks that a guest can load and start music before becoming host. The WAV response is supplied by the test with HTTP byte-range support; the YouTube error-path test substitutes its iframe API.
+
+The invite test checks CTA placement at desktop and phone widths, decodes the rendered QR image, follows that URL in a second browser session, joins the room, and verifies the dialog returns keyboard focus when closed.
 
 ```bash
 npx playwright install chromium
