@@ -76,7 +76,7 @@ function App() {
             </p>
             <div className="hero-actions">
               <a className="primary-cta" href="/create-room" onClick={(event) => { event.preventDefault(); navigate("/create-room"); }}>Make a room <span>↗</span></a>
-              <a className="secondary-cta" href="#how-it-works">See how it works <span>↓</span></a>
+              <a className="primary-cta" href="/room/join" onClick={(event) => { event.preventDefault(); navigate("/room/join"); }}>Join a room <span>↗</span></a>
             </div>
             <p className="hero-note"><span>✦</span> Start a room, share the code, press play.</p>
           </div>
