@@ -60,6 +60,7 @@ test("health, validation and public room responses never expose credentials", as
 
 test("tokens are registered, scoped to a room, and cannot spoof host permissions", async () => {
   const { room, host } = await createRoom();
+  await command(host, "room:settings", { allowEveryone: false });
   const stranger = await connect();
   assert.equal((await command(stranger, "room:join", { code: room.code, token: "made-up", isHost: true })).ok, false);
   assert.equal((await command(stranger, "host:transfer", { participantId: "anyone" })).ok, false);
@@ -126,12 +127,19 @@ test("host transfer is immediate and persists after reconnecting the old host", 
   assert.equal((await command(reconnected, "host:transfer", { participantId: room.participantId })).ok, false);
 });
 
-test("shared controls allow guests to play and choose music, but host administration stays protected", async () => {
+test("everyone can choose music by default, and the host can lock or reopen shared controls", async () => {
   const { room, host } = await createRoom();
   const guest = await join(room);
+  assert.equal((await state(guest.socket)).allowEveryone, true);
+  let mediaRevision = await load(host);
+  assert.equal((await command(guest.socket, "playback:update", { action: "play", mediaRevision })).ok, true);
+  assert.equal((await command(guest.socket, "room:settings", { allowEveryone: false })).ok, false);
+  await command(host, "room:settings", { allowEveryone: false });
+  assert.equal((await command(guest.socket, "media:update", { media: { type: "audio", url: "https://example.com/song.mp3", title: "A song" } })).ok, false);
+  assert.equal((await command(guest.socket, "playback:update", { action: "pause", mediaRevision })).ok, false);
   await command(host, "room:settings", { allowEveryone: true });
   assert.equal((await command(guest.socket, "media:update", { media: { type: "audio", url: "https://example.com/song.mp3", title: "A song" } })).ok, true);
-  const mediaRevision = (await state(guest.socket)).playback.mediaRevision;
+  mediaRevision = (await state(guest.socket)).playback.mediaRevision;
   assert.equal((await command(guest.socket, "playback:update", { action: "play", mediaRevision })).ok, true);
   assert.equal((await command(guest.socket, "room:settings", { allowEveryone: false })).ok, false);
   await command(host, "room:settings", { allowEveryone: false });

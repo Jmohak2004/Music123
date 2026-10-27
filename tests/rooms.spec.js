@@ -59,7 +59,7 @@ test("two devices play real audio, transfer hosting, share controls, reload and 
     await expect(page.getByText("2 online")).toBeVisible();
     await loadAudio(page);
     await expect(guest.getByRole("button", { name: "Enable audio" })).toBeEnabled();
-    await expect(guest.getByRole("button", { name: "Play together" })).toBeDisabled();
+    await expect(guest.getByRole("button", { name: "Play together" })).toBeEnabled();
     await page.getByRole("button", { name: "Play together" }).click();
     await guest.getByRole("button", { name: "Enable audio" }).click();
     await expect.poll(async () => (await audioState(page)).time).toBeGreaterThan(0.5);
@@ -79,6 +79,8 @@ test("two devices play real audio, transfer hosting, share controls, reload and 
     await expect(page.getByRole("button", { name: "Play together" })).toBeDisabled();
     await guest.getByRole("button", { name: "Play together" }).click();
     await expect.poll(async () => (await audioState(page)).paused).toBe(false);
+    await guest.getByRole("checkbox", { name: "Let everyone control music" }).uncheck();
+    await expect(page.getByRole("button", { name: "Pause together" })).toBeDisabled();
     await guest.getByRole("checkbox", { name: "Let everyone control music" }).check();
     await expect(page.getByRole("button", { name: "Pause together" })).toBeEnabled();
     await page.getByRole("button", { name: "Pause together" }).click();

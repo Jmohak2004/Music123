@@ -33,7 +33,7 @@ export function createEchoServer({ hostGraceMs = 15_000 } = {}) {
     const participant = { id: crypto.randomUUID(), name: host };
     const room = {
       code, name, hostId: participant.id, participants: new Map([[token, participant]]), members: new Map(),
-      createdAt: Date.now(), allowEveryone: false, hostTimer: null, messages: [],
+      createdAt: Date.now(), allowEveryone: true, hostTimer: null, messages: [],
       playback: { media: null, videoId: null, playing: false, position: 0, updatedAt: Date.now(), revision: 0, mediaRevision: 0 },
     };
     rooms.set(code, room);

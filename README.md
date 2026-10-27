@@ -5,8 +5,8 @@ A shared listening room: create a room, invite friends, choose music, and hear i
 ## What works
 
 - Room codes and shareable invite links, with named listeners and room chat.
-- One host controls music by default. **Make host** immediately hands control to another connected listener; the previous host becomes a listener.
-- The host can turn on **Let everyone control music** so anyone can choose a track, play, pause, or seek for the whole room. Only the host can change this setting or transfer hosting.
+- Anyone in the room can choose a track, play, pause, and seek for everyone. The host can turn off **Let everyone control music** to restrict playback controls to the host.
+- **Make host** immediately hands hosting to another connected listener; the previous host becomes a listener. Only the current host can transfer hosting or change the shared controls setting.
 - YouTube links (including Music, Shorts, and short links) and public direct HTTPS audio links. Audio formats depend on the device/browser; MP3 and WAV are good starting points. Spotify/Apple Music webpage URLs and DRM-protected content are not direct audio links.
 - Each listener plays the selected source locally. Audio follows their operating system's selected output: built-in speakers, wired headphones, or connected Bluetooth. Volume is local to each device.
 - Each listener taps **Enable audio** when prompted. Browser autoplay restrictions may require another tap after replacing a YouTube player. The host's **Play together** button also enables their own audio.
@@ -33,9 +33,9 @@ Open `http://localhost:5173`. To test on phones on the same Wi-Fi, open `http://
 
 1. Create a room and copy its invite or share the room code.
 2. Each friend joins with a name.
-3. The host loads a YouTube link or chooses **Direct audio link** and loads a public audio-file URL.
-4. Each listener enables audio; the host presses **Play together**.
-5. Use **Make host** or enable shared controls to let someone else choose music.
+3. Any room member loads a YouTube link or a public direct audio-file URL.
+4. Each listener enables audio; anyone presses **Play together**.
+5. Anyone can pick the next song. Use **Make host** to hand host duties to another listener, or turn off shared controls to keep playback host-only.
 
 Choose Bluetooth/headphones in each device's system audio settings. Keep the page open and the device awake while listening; background/locked mobile browsers can suspend media or network activity. This app plays selected links, not arbitrary audio from other apps or the host's entire system.
 

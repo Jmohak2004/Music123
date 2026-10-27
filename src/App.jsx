@@ -16,7 +16,7 @@ const steps = [
   {
     number: "03",
     title: "Listen together",
-    description: "The host controls playback while everyone stays in sync.",
+    description: "Anyone can choose and play a track; everyone in the room hears it together.",
   },
 ];
 
