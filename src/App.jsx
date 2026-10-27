@@ -120,7 +120,10 @@ function App() {
             <span className="section-label">The room is yours</span>
             <h2>Bring your people.<br /><em>We’ll bring the rhythm.</em></h2>
           </div>
-          <a className="primary-cta light-cta" href="/create-room" onClick={(event) => { event.preventDefault(); navigate("/create-room"); }}>Make a room <span>↗</span></a>
+          <div className="final-cta-actions">
+            <a className="primary-cta light-cta" href="/create-room" onClick={(event) => { event.preventDefault(); navigate("/create-room"); }}>Make a room <span>↗</span></a>
+            <a className="primary-cta light-cta" href="/room/join" onClick={(event) => { event.preventDefault(); navigate("/room/join"); }}>Join a room <span>↗</span></a>
+          </div>
         </section>
       </main>
 
