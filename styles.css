@@ -253,6 +253,7 @@ h1 em { color: var(--coral); font-style: normal; }
 .hero-copy h1 { font-size: clamp(42px, 6.5vw, 79px); line-height: .9; }
 .hero-description { max-width: 380px; margin: clamp(16px, 2.5vw, 27px) 0; color: #78756f; font-size: clamp(13px, 1.6vw, 15px); line-height: 1.65; }
 .hero-actions { display: flex; align-items: center; gap: clamp(14px, 2.5vw, 23px); flex-wrap: wrap; }
+.hero-actions .primary-cta { justify-content: space-between; min-width: 0; }
 .primary-cta { display: inline-flex; align-items: center; gap: clamp(10px, 1.5vw, 18px); padding: clamp(11px, 1.5vw, 14px) clamp(14px, 1.8vw, 17px); border-radius: 4px; background: var(--coral); color: #fff; box-shadow: 0 8px 18px rgba(199,88,67,.18); font-size: var(--text-xs); text-decoration: none; white-space: nowrap; transition: background var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease); }
 .primary-cta span { font-size: 18px; line-height: 10px; }
 .primary-cta:hover { background: var(--coral-dark); transform: translateY(-2px); box-shadow: 0 12px 24px rgba(199,88,67,.28); }
@@ -319,6 +320,7 @@ h1 em { color: var(--coral); font-style: normal; }
 .final-cta h2 { margin: 13px 0 0; color: #fff8e9; font-size: clamp(26px, 4vw, 47px); line-height: .94; letter-spacing: -.07em; }
 .light-cta { background: #e7896c; flex-shrink: 0; }
 .light-cta:hover { background: #f09a7e; }
+.final-cta-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .landing-footer { width: min(1180px, calc(100% - var(--page-gutter) * 2)); margin: 0 auto; padding: clamp(16px, 2.5vw, 23px) 0 clamp(20px, 3vw, 30px); display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--line); color: #aaa49c; font-size: 10px; gap: var(--space-md); flex-wrap: wrap; }
 .landing-footer .brand { font-size: clamp(15px, 2vw, 18px); }
 .landing-footer .brand-mark { transform: scale(.75); transform-origin: right center; }
